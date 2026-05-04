@@ -411,7 +411,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
@@ -425,12 +425,60 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 🔥 זה מה שהופך את זה לעובד אצלך בקוד הראשי
+// חשיפה ל-window כדי שהטופס למטה יוכל לשלוח הזמנות
 window.db = db;
-window.firebaseAPI = {
-  collection,
-  addDoc
-};
+window.firebaseAPI = { collection, addDoc };
+
+// ── 1. טעינת הגלריה מ-Firebase לתוך דף הבית בזמן אמת ──
+onSnapshot(collection(db, "gallery"), (snap) => {
+  const gallery = snap.docs.map(d => d.data());
+  const grid = document.getElementById('galleryGrid');
+  if (grid && gallery.length > 0) {
+    grid.innerHTML = gallery.map(img => `
+      <div class="gallery-item" data-cat="${img.cat}">
+        <img src="${img.file.startsWith('data:') || img.file.startsWith('http') ? img.file : 'images/' + img.file}" 
+             alt="${img.title || ''}" 
+             loading="lazy" 
+             onclick="openLightbox(this.src)" />
+      </div>
+    `).join('');
+  }
+});
+
+// ── 2. טעינת ההגדרות והתמונות הראשיות (Settings + Hero) מ-Firebase ──
+onSnapshot(doc(db, "settings", "site"), (snap) => {
+  if (snap.exists()) {
+    const s = snap.data();
+    
+    // תמונות
+    if(s.heroImage && document.getElementById('heroImg')) document.getElementById('heroImg').src = s.heroImage;
+    if(s.aboutImg1 && document.getElementById('aboutImg1')) document.getElementById('aboutImg1').src = s.aboutImg1;
+    if(s.aboutImg2 && document.getElementById('aboutImg2')) document.getElementById('aboutImg2').src = s.aboutImg2;
+
+    // טקסטים - Hero
+    if(s.hero?.titleLine1 && document.getElementById('heroLine1')) document.getElementById('heroLine1').innerText = s.hero.titleLine1;
+    if(s.hero?.titleLine2 && document.getElementById('heroLine2')) document.getElementById('heroLine2').innerText = s.hero.titleLine2;
+    if(s.hero?.sub && document.getElementById('heroSub')) document.getElementById('heroSub').innerText = s.hero.sub;
+
+    // פרטי קשר בפוטר
+    if(s.phone && document.getElementById('footPhone')) {
+        document.getElementById('footPhone').innerText = s.phone;
+        document.getElementById('footPhone').href = 'tel:' + s.phone.replace(/[^\d+]/g, '');
+    }
+    if(s.email && document.getElementById('footMail')) {
+        document.getElementById('footMail').innerText = s.email;
+        document.getElementById('footMail').href = 'mailto:' + s.email;
+    }
+    if(s.whatsapp && document.getElementById('footWa')) {
+        document.getElementById('footWa').href = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
+    }
+    
+    // עדכון טלפון צף/סטיקי אם קיימים ב-HTML
+    if(s.whatsapp && document.getElementById('floatWa')) {
+        document.getElementById('floatWa').href = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
+    }
+  }
+});
 </script>
 
 <!-- סקריפט התרגום - חיבור הטפסים ל-CMS -->

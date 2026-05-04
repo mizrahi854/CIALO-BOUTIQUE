@@ -442,14 +442,33 @@ table tr:last-child td{border-bottom:none}
     </div>
   </div>
 </div>
+<script type="module">
+// ── FIREBASE (v12) ──────────────────────────────────────
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { 
+  getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, setDoc, getDoc, getDocs 
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
-<script>
-// ── CONSTANTS ──────────────────────────────────────────
-const SETTINGS_KEY = 'cialo:settings:v2';
-const BOOKINGS_KEY = 'cialo:bookings:v1';
-const GALLERY_KEY  = 'cialo:gallery:v1';
-const PASS_KEY     = 'cialo:pass';
+const firebaseConfig = {
+  apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
+  authDomain: "cialo-boutique.firebaseapp.com",
+  projectId: "cialo-boutique",
+  storageBucket: "cialo-boutique.firebasestorage.app",
+  messagingSenderId: "3716819450",
+  appId: "1:3716819450:web:69e9d4b528b23893efdc43"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ── GLOBAL STATE ────────────────────────────────────────
+let BOOKINGS = [];
+let GALLERY = [];
+let SETTINGS = {};
+
+// ── CONSTANTS & DEFAULTS ────────────────────────────────
 const DEFAULT_PASS = 'cialo2026';
+function getPass() { return sessionStorage.getItem('cialo:pass') || DEFAULT_PASS; }
 
 const DEFAULT_GALLERY = [
   {id:'g1',file:'vila_681_331148_JmHVx7E.jpg',title:'בריכה מחוממת',cat:'בריכה'},
@@ -491,142 +510,175 @@ const DEFAULT_SETTINGS = {
   heroImage:'',aboutImg1:'',aboutImg2:'',
 };
 
-// ── HELPERS ────────────────────────────────────────────
-const lsGet = (k,d) => { try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d} };
-const lsSet = (k,v) => localStorage.setItem(k,JSON.stringify(v));
-const getSettings  = () => ({...DEFAULT_SETTINGS,...lsGet(SETTINGS_KEY,{})});
-const getBookings  = () => lsGet(BOOKINGS_KEY,[]);
-const saveBookings = b  => lsSet(BOOKINGS_KEY,b);
-const getGallery   = () => { const g=lsGet(GALLERY_KEY,null); return g||DEFAULT_GALLERY; };
-const saveGallery  = g  => lsSet(GALLERY_KEY,g);
-const getPass      = () => localStorage.getItem(PASS_KEY)||DEFAULT_PASS;
-
-function imgSrc(item){
-  if(!item.file)return '';
-  if(item.file.startsWith('data:')||item.file.startsWith('http'))return item.file;
-  return 'images/'+item.file;
+function imgSrc(item) {
+  if(!item.file) return '';
+  if(item.file.startsWith('data:') || item.file.startsWith('http')) return item.file;
+  return 'images/' + item.file;
 }
 
-// ── AUTH ───────────────────────────────────────────────
-function isAuthed(){return sessionStorage.getItem('cialo:auth')==='1'}
-function doLogin(){
-  const p=document.getElementById('passInput').value;
-  if(p===getPass()){
-    sessionStorage.setItem('cialo:auth','1');
+function fileToDataUrl(file, cb) {
+  const r = new FileReader();
+  r.onload = e => cb(e.target.result);
+  r.readAsDataURL(file);
+}
+
+// ── SEED DEFAULTS TO FIRESTORE (RUNS ONCE) ─────────────
+const settingsRef = doc(db, "settings", "site");
+
+async function seedDefaultsIfNeeded() {
+  try {
+    // Check & Seed Settings
+    const setSnap = await getDoc(settingsRef);
+    if (!setSnap.exists()) {
+      await setDoc(settingsRef, DEFAULT_SETTINGS);
+    }
+    // Check & Seed Gallery
+    const galSnap = await getDocs(collection(db, "gallery"));
+    if (galSnap.empty) {
+      for (const item of DEFAULT_GALLERY) {
+        // שומר כל תמונה עם ה-ID המקורי שלה
+        await setDoc(doc(db, "gallery", item.id), item);
+      }
+    }
+  } catch (err) {
+    console.error("Error seeding defaults:", err);
+  }
+}
+seedDefaultsIfNeeded();
+
+// ── REALTIME LISTENERS (SYNC) ───────────────────────────
+onSnapshot(collection(db, "bookings"), (snap) => {
+  BOOKINGS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  BOOKINGS.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // חדש למעלה
+  if (isAuthed()) renderBookings();
+});
+
+onSnapshot(collection(db, "gallery"), (snap) => {
+  GALLERY = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (isAuthed()) renderGalleryAdmin();
+});
+
+onSnapshot(settingsRef, (snap) => {
+  SETTINGS = snap.exists() ? snap.data() : DEFAULT_SETTINGS;
+  if (isAuthed()) {
+    loadSettingsForm();
+    loadHeroForm();
+  }
+});
+
+// ── AUTH ────────────────────────────────────────────────
+function isAuthed() { return sessionStorage.getItem('cialo:auth') === '1'; }
+
+window.doLogin = function() {
+  const p = document.getElementById('passInput').value;
+  if(p === getPass()){
+    sessionStorage.setItem('cialo:auth', '1');
     show();
   } else {
-    const err=document.getElementById('authErr');
-    err.style.display='block';
-    document.getElementById('passInput').value='';
-    setTimeout(()=>err.style.display='none',3000);
+    const err = document.getElementById('authErr');
+    if(err) {
+      err.style.display = 'block';
+      document.getElementById('passInput').value = '';
+      setTimeout(() => err.style.display = 'none', 3000);
+    }
   }
 }
-function doLogout(){sessionStorage.removeItem('cialo:auth');show()}
-function show(){
-  if(isAuthed()){
-    document.getElementById('authScreen').style.display='none';
-    document.getElementById('adminScreen').style.display='block';
-    init();
-  } else {
-    document.getElementById('authScreen').style.display='flex';
-    document.getElementById('adminScreen').style.display='none';
-  }
-}
-document.getElementById('passInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
-// ── TABS ───────────────────────────────────────────────
-document.querySelectorAll('.tab-btn,.m-tab').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const t=btn.dataset.tab;
-    document.querySelectorAll('.tab-btn,.m-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-    document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+t));
+window.doLogout = function() { 
+  sessionStorage.removeItem('cialo:auth'); 
+  show(); 
+}
+
+function show() {
+  if(isAuthed()){
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+    renderBookings();
+    renderGalleryAdmin();
+    loadHeroForm();
+    loadSettingsForm();
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('adminScreen').style.display = 'none';
+  }
+}
+
+document.getElementById('passInput')?.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin() });
+
+// ── TABS ────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn, .m-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn, .m-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + t));
   });
 });
 
-// ── CONFIRM ────────────────────────────────────────────
-let confirmCb=null;
-function confirm2(msg,cb){
-  document.getElementById('confirmMsg').textContent=msg;
+// ── CONFIRM MODAL ───────────────────────────────────────
+let confirmCb = null;
+window.confirm2 = function(msg, cb) {
+  document.getElementById('confirmMsg').textContent = msg;
   document.getElementById('confirmModal').classList.add('open');
-  confirmCb=cb;
+  confirmCb = cb;
 }
-function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');confirmCb=null}
-document.getElementById('confirmOkBtn').onclick=()=>{if(confirmCb)confirmCb();closeConfirm()};
-document.getElementById('confirmModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeConfirm()});
+window.closeConfirm = function() { 
+  document.getElementById('confirmModal').classList.remove('open'); 
+  confirmCb = null; 
+}
+document.getElementById('confirmOkBtn').onclick = () => { if(confirmCb) confirmCb(); window.closeConfirm(); };
+document.getElementById('confirmModal').addEventListener('click', e => { if(e.target === e.currentTarget) window.closeConfirm(); });
 
-// ── BOOKING DETAIL ─────────────────────────────────────
-let detailBookingId=null;
-function openDetail(id){
-  const bookings=getBookings();
-  const b=bookings.find(x=>x.id===id);
-  if(!b)return;
-  detailBookingId=id;
-  const S=getSettings();
-  const waMsg=`*Villa Cialo Boutique*\nשלום ${b.name},\n`;
-  document.getElementById('detailWa').href=`https://wa.me/${b.phone.replace(/[^\d]/,'')}?text=${encodeURIComponent(waMsg)}`;
-  document.getElementById('detailCall').href=`tel:${b.phone.replace(/[^\d+]/g,'')}`;
-  document.getElementById('detailNote').value=b.note||'';
-  document.getElementById('detailContent').innerHTML=`
-    <div class="detail-row"><span>שם</span><span>${b.name||'-'}</span></div>
-    <div class="detail-row"><span>טלפון</span><span>${b.phone||'-'}</span></div>
-    <div class="detail-row"><span>כניסה</span><span>${b.checkin||'-'}</span></div>
-    <div class="detail-row"><span>יציאה</span><span>${b.checkout||'-'}</span></div>
-    <div class="detail-row"><span>אורחים</span><span>${b.guests||'-'}</span></div>
-    <div class="detail-row"><span>אירוע</span><span>${b.event||'-'}</span></div>
-    <div class="detail-row"><span>הערות אורח</span><span>${b.notes||'-'}</span></div>
-    <div class="detail-row"><span>התקבל</span><span>${new Date(b.createdAt).toLocaleString('he-IL')}</span></div>
-    <div class="detail-row"><span>סטטוס</span><span>${b.status}</span></div>
-  `;
-  document.getElementById('detailModal').classList.add('open');
-}
-function saveDetailNote(){
-  const bookings=getBookings();
-  const idx=bookings.findIndex(x=>x.id===detailBookingId);
-  if(idx>=0){bookings[idx].note=document.getElementById('detailNote').value;saveBookings(bookings);}
-  closeDetail();
+// ── BOOKINGS UI & ACTIONS ───────────────────────────────
+const STATUS_CLASS = { 'חדש': 'badge-new', 'יצרנו קשר': 'badge-contacted', 'סגור': 'badge-done', 'בוטל': 'badge-cancelled' };
+let bookFilter = 'הכל';
+
+document.getElementById('bookFilter')?.addEventListener('click', e => {
+  const p = e.target.closest('.fpill'); if(!p) return;
+  document.querySelectorAll('.fpill').forEach(x => x.classList.remove('active'));
+  p.classList.add('active');
+  bookFilter = p.dataset.f;
   renderBookings();
-}
-function closeDetail(){document.getElementById('detailModal').classList.remove('open');detailBookingId=null}
-document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDetail()});
+});
 
-// ── BOOKINGS ───────────────────────────────────────────
-const STATUS_CLASS={חדש:'badge-new','יצרנו קשר':'badge-contacted','סגור':'badge-done','בוטל':'badge-cancelled'};
-let bookFilter='הכל';
+function renderBookings() {
+  const body = document.getElementById('bookBody');
+  const empty = document.getElementById('bookEmpty');
+  if(!body || !empty) return;
 
-function renderBookings(){
-  const all=getBookings();
-  // Stats
-  const neu=all.filter(b=>b.status==='חדש').length;
-  document.getElementById('bookStats').innerHTML=`
-    <div class="stat-box"><div class="stat-label">סה"כ הזמנות</div><div class="stat-val">${all.length}</div></div>
-    <div class="stat-box"><div class="stat-label">חדשות</div><div class="stat-val" style="color:var(--gold2)">${neu}</div></div>
-    <div class="stat-box"><div class="stat-label">יצרנו קשר</div><div class="stat-val">${all.filter(b=>b.status==='יצרנו קשר').length}</div></div>
-    <div class="stat-box"><div class="stat-label">סגורות</div><div class="stat-val" style="color:var(--green)">${all.filter(b=>b.status==='סגור').length}</div></div>
-  `;
-  const list=bookFilter==='הכל'?all:all.filter(b=>b.status===bookFilter);
-  const body=document.getElementById('bookBody');
-  const empty=document.getElementById('bookEmpty');
-  if(list.length===0){body.innerHTML='';empty.style.display='block';return}
-  empty.style.display='none';
-  body.innerHTML=list.map(b=>`
+  const neu = BOOKINGS.filter(b => b.status === 'חדש').length;
+  const statsBox = document.getElementById('bookStats');
+  if (statsBox) {
+    statsBox.innerHTML = `
+      <div class="stat-box"><div class="stat-label">סה"כ הזמנות</div><div class="stat-val">${BOOKINGS.length}</div></div>
+      <div class="stat-box"><div class="stat-label">חדשות</div><div class="stat-val" style="color:var(--gold2)">${neu}</div></div>
+      <div class="stat-box"><div class="stat-label">יצרנו קשר</div><div class="stat-val">${BOOKINGS.filter(b=>b.status==='יצרנו קשר').length}</div></div>
+      <div class="stat-box"><div class="stat-label">סגורות</div><div class="stat-val" style="color:var(--green)">${BOOKINGS.filter(b=>b.status==='סגור').length}</div></div>
+    `;
+  }
+
+  const list = bookFilter === 'הכל' ? BOOKINGS : BOOKINGS.filter(b => b.status === bookFilter);
+  if(list.length === 0){ body.innerHTML = ''; empty.style.display = 'block'; return; }
+  
+  empty.style.display = 'none';
+  body.innerHTML = list.map(b => `
     <tr>
-      <td><strong>${b.name||'-'}</strong></td>
-      <td>${b.phone||'-'}</td>
-      <td>${b.checkin||'-'}</td>
-      <td>${b.checkout||'-'}</td>
-      <td style="text-align:center">${b.guests||'-'}</td>
-      <td>${b.event||'-'}</td>
-      <td><span class="badge ${STATUS_CLASS[b.status]||'badge-new'}">${b.status}</span></td>
-      <td style="font-size:.75rem;color:var(--muted)">${new Date(b.createdAt).toLocaleDateString('he-IL')}</td>
+      <td><strong>${b.name || '-'}</strong></td>
+      <td>${b.phone || '-'}</td>
+      <td>${b.checkin || '-'}</td>
+      <td>${b.checkout || '-'}</td>
+      <td style="text-align:center">${b.guests || '-'}</td>
+      <td>${b.event || '-'}</td>
+      <td><span class="badge ${STATUS_CLASS[b.status] || 'badge-new'}">${b.status || 'חדש'}</span></td>
+      <td style="font-size:.75rem;color:var(--muted)">${b.createdAt ? new Date(b.createdAt).toLocaleDateString('he-IL') : '-'}</td>
       <td>
         <div class="act-btns">
           <button class="btn btn-sm" style="background:transparent;border:1px solid var(--line);color:var(--text-soft,#b9ad97);font-size:.65rem" onclick="openDetail('${b.id}')">👁 פרטים</button>
           <select style="background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:.3rem .5rem;font-size:.68rem;cursor:pointer" onchange="setStatus('${b.id}',this.value)">
             <option value="">סטטוס</option>
-            <option value="חדש">חדש</option>
-            <option value="יצרנו קשר">יצרנו קשר</option>
-            <option value="סגור">סגור</option>
-            <option value="בוטל">בוטל</option>
+            <option value="חדש" ${b.status==='חדש'?'selected':''}>חדש</option>
+            <option value="יצרנו קשר" ${b.status==='יצרנו קשר'?'selected':''}>יצרנו קשר</option>
+            <option value="סגור" ${b.status==='סגור'?'selected':''}>סגור</option>
+            <option value="בוטל" ${b.status==='בוטל'?'selected':''}>בוטל</option>
           </select>
           <a href="https://wa.me/${(b.phone||'').replace(/[^\d]/g,'')}" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;text-decoration:none;font-size:.68rem">WA</a>
           <button class="btn btn-red btn-sm" onclick="deleteBooking('${b.id}')">🗑</button>
@@ -636,44 +688,81 @@ function renderBookings(){
   `).join('');
 }
 
-function setStatus(id,status){
-  if(!status)return;
-  const all=getBookings();
-  const idx=all.findIndex(b=>b.id===id);
-  if(idx>=0){all[idx].status=status;saveBookings(all);}
-  renderBookings();
-}
-function deleteBooking(id){
-  confirm2('למחוק הזמנה זו לצמיתות?',()=>{
-    saveBookings(getBookings().filter(b=>b.id!==id));
-    renderBookings();
+window.addBooking = async function(data) {
+  await addDoc(collection(db, "bookings"), {
+    ...data,
+    createdAt: new Date().toISOString(),
+    status: "חדש"
   });
-}
+};
 
-document.getElementById('bookFilter').addEventListener('click',e=>{
-  const p=e.target.closest('.fpill');if(!p)return;
-  document.querySelectorAll('.fpill').forEach(x=>x.classList.remove('active'));
-  p.classList.add('active');
-  bookFilter=p.dataset.f;
-  renderBookings();
-});
+window.setStatus = async function(id, status) {
+  if(!status) return;
+  await updateDoc(doc(db, "bookings", id), { status });
+};
 
-// ── GALLERY ────────────────────────────────────────────
-function renderGalleryAdmin(){
-  const gallery=getGallery();
-  const grid=document.getElementById('galGrid');
-  const empty=document.getElementById('galEmpty');
-  document.getElementById('galCount').textContent=`${gallery.length} תמונות בגלריה`;
-  if(!gallery.length){grid.innerHTML='';empty.style.display='block';return}
-  empty.style.display='none';
+window.deleteBooking = function(id) {
+  window.confirm2('למחוק הזמנה זו לצמיתות?', async () => {
+    await deleteDoc(doc(db, "bookings", id));
+  });
+};
+
+// ── BOOKING DETAIL MODAL ────────────────────────────────
+let detailBookingId = null;
+
+window.openDetail = function(id) {
+  const b = BOOKINGS.find(x => x.id === id);
+  if(!b) return;
+  detailBookingId = id;
+  const waMsg = `*Villa Cialo Boutique*\nשלום ${b.name},\n`;
+  document.getElementById('detailWa').href = `https://wa.me/${(b.phone||'').replace(/[^\d]/,'')}?text=${encodeURIComponent(waMsg)}`;
+  document.getElementById('detailCall').href = `tel:${(b.phone||'').replace(/[^\d+]/g,'')}`;
+  document.getElementById('detailNote').value = b.notes || '';
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-row"><span>שם</span><span>${b.name || '-'}</span></div>
+    <div class="detail-row"><span>טלפון</span><span>${b.phone || '-'}</span></div>
+    <div class="detail-row"><span>כניסה</span><span>${b.checkin || '-'}</span></div>
+    <div class="detail-row"><span>יציאה</span><span>${b.checkout || '-'}</span></div>
+    <div class="detail-row"><span>אורחים</span><span>${b.guests || '-'}</span></div>
+    <div class="detail-row"><span>אירוע</span><span>${b.event || '-'}</span></div>
+    <div class="detail-row"><span>הערות אורח</span><span>${b.notes || '-'}</span></div>
+    <div class="detail-row"><span>התקבל</span><span>${b.createdAt ? new Date(b.createdAt).toLocaleString('he-IL') : '-'}</span></div>
+    <div class="detail-row"><span>סטטוס</span><span>${b.status || 'חדש'}</span></div>
+  `;
+  document.getElementById('detailModal').classList.add('open');
+};
+
+window.saveDetailNote = async function() {
+  if(!detailBookingId) return;
+  const note = document.getElementById('detailNote').value;
+  await updateDoc(doc(db, "bookings", detailBookingId), { notes: note });
+  window.closeDetail();
+};
+
+window.closeDetail = function() { 
+  document.getElementById('detailModal').classList.remove('open'); 
+  detailBookingId = null; 
+};
+document.getElementById('detailModal')?.addEventListener('click', e => { if(e.target === e.currentTarget) window.closeDetail(); });
+
+// ── GALLERY UI & ACTIONS ────────────────────────────────
+function renderGalleryAdmin() {
+  const grid = document.getElementById('galGrid');
+  const empty = document.getElementById('galEmpty');
+  if(!grid || !empty) return;
+
+  const countEl = document.getElementById('galCount');
+  if(countEl) countEl.textContent = `${GALLERY.length} תמונות בגלריה`;
+
+  if(!GALLERY.length){ grid.innerHTML = ''; empty.style.display = 'block'; return; }
   
-  // הוספתי תפריט <select> על כל תמונה כדי שתוכל לשנות את הקטגוריה בקלות
-  grid.innerHTML=gallery.map(img=>`
+  empty.style.display = 'none';
+  grid.innerHTML = GALLERY.map(img => `
     <div class="g-card">
-      <img src="${imgSrc(img)}" alt="${img.title}" onerror="this.style.display='none'" />
+      <img src="${imgSrc(img)}" alt="${img.title || ''}" onerror="this.style.display='none'" />
       <button class="g-del" onclick="deleteGalleryItem('${img.id}')">✕ מחק</button>
       <div class="g-card-body">
-        <p>${img.title}</p>
+        <p>${img.title || ''}</p>
         <select class="g-cat-select" onchange="updateGalleryCategory('${img.id}', this.value)">
           <option value="בריכה" ${img.cat === 'בריכה' ? 'selected' : ''}>בריכה</option>
           <option value="ג'קוזי" ${img.cat === "ג'קוזי" ? 'selected' : ''}>ג'קוזי</option>
@@ -686,223 +775,172 @@ function renderGalleryAdmin(){
   `).join('');
 }
 
-// הפונקציה ששומרת את השינוי של הקטגוריה
-function updateGalleryCategory(id, newCat) {
-  const gallery = getGallery();
-  const imgIndex = gallery.findIndex(g => g.id === id);
-  if (imgIndex !== -1) {
-    gallery[imgIndex].cat = newCat;
-    saveGallery(gallery);
-  }
-}
-
-function toggleAddPanel(){
+window.toggleAddPanel = function() {
   document.getElementById('addPanel').classList.toggle('open');
-  document.getElementById('g-url').value='';
-  document.getElementById('g-title').value='';
-  document.getElementById('imgPreview').style.display='none';
-}
+  document.getElementById('g-url').value = '';
+  document.getElementById('g-title').value = '';
+  document.getElementById('imgPreview').style.display = 'none';
+};
 
-function handleFileUpload(){
-  const f=document.getElementById('imgFileInput').files[0];
-  if(!f)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const prev=document.getElementById('imgPreview');
-    prev.src=e.target.result;
-    prev.style.display='block';
-    document.getElementById('g-url').value=e.target.result;
-  };
-  reader.readAsDataURL(f);
-}
-
-function previewUrl(){
-  const url=document.getElementById('g-url').value.trim();
-  const prev=document.getElementById('imgPreview');
-  if(url){prev.src=url;prev.style.display='block';}
-  else prev.style.display='none';
-}
-
-function addGalleryItem(){
-  const file=document.getElementById('g-url').value.trim();
-  const title=document.getElementById('g-title').value.trim()||'תמונה';
-  const cat=document.getElementById('g-cat').value;
-  if(!file){alert('נא לבחור תמונה או להזין URL');return;}
-  const gallery=getGallery();
-  gallery.push({id:'g'+Date.now(),file,title,cat});
-  saveGallery(gallery);
-  toggleAddPanel();
-  renderGalleryAdmin();
-}
-
-function deleteGalleryItem(id){
-  confirm2('למחוק תמונה זו מהגלריה?',()=>{
-    saveGallery(getGallery().filter(g=>g.id!==id));
-    renderGalleryAdmin();
+window.handleFileUpload = function() {
+  const f = document.getElementById('imgFileInput').files[0];
+  if(!f) return;
+  fileToDataUrl(f, url => {
+    const prev = document.getElementById('imgPreview');
+    prev.src = url; prev.style.display = 'block';
+    document.getElementById('g-url').value = url;
   });
-}
+};
 
-// ── HERO ───────────────────────────────────────────────
-function fileToDataUrl(file,cb){
-  const r=new FileReader();
-  r.onload=e=>cb(e.target.result);
-  r.readAsDataURL(file);
-}
+window.previewUrl = function() {
+  const url = document.getElementById('g-url').value.trim();
+  const prev = document.getElementById('imgPreview');
+  if(url){ prev.src = url; prev.style.display = 'block'; }
+  else prev.style.display = 'none';
+};
 
-function handleHeroUpload(input){
-  const f=input.files[0];if(!f)return;
-  fileToDataUrl(f,url=>{
-    document.getElementById('heroImgUrl').value=url;
-    const p=document.getElementById('heroImgPreview');p.src=url;p.style.display='block';
-  });
-}
-function previewHeroUrl(){
-  const url=document.getElementById('heroImgUrl').value.trim();
-  const p=document.getElementById('heroImgPreview');
-  p.src=url;p.style.display=url?'block':'none';
-}
-function handleAbout1Upload(input){
-  const f=input.files[0];if(!f)return;
-  fileToDataUrl(f,url=>{
-    document.getElementById('about1Url').value=url;
-    const p=document.getElementById('about1Preview');p.src=url;p.style.display='block';
-  });
-}
-function previewAbout1(){
-  const url=document.getElementById('about1Url').value.trim();
-  const p=document.getElementById('about1Preview');p.src=url;p.style.display=url?'block':'none';
-}
-function handleAbout2Upload(input){
-  const f=input.files[0];if(!f)return;
-  fileToDataUrl(f,url=>{
-    document.getElementById('about2Url').value=url;
-    const p=document.getElementById('about2Preview');p.src=url;p.style.display='block';
-  });
-}
-function previewAbout2(){
-  const url=document.getElementById('about2Url').value.trim();
-  const p=document.getElementById('about2Preview');p.src=url;p.style.display=url?'block':'none';
-}
+window.addGalleryItem = async function() {
+  const file = document.getElementById('g-url').value.trim();
+  const title = document.getElementById('g-title').value.trim() || 'תמונה';
+  const cat = document.getElementById('g-cat').value;
+  if(!file){ alert('נא לבחור תמונה או להזין URL'); return; }
 
-function loadHeroForm(){
-  const s=getSettings();
-  document.getElementById('heroLine1').value=s.hero?.titleLine1||'';
-  document.getElementById('heroLine2').value=s.hero?.titleLine2||'';
-  document.getElementById('heroSub').value=s.hero?.sub||'';
+  // במקום לייצר ID רנדומלי שיכול להשתנות, נותנים ל-Firebase לייצר מסמך
+  await addDoc(collection(db, "gallery"), { file, title, cat });
+  window.toggleAddPanel();
+};
+
+window.deleteGalleryItem = function(id) {
+  window.confirm2('למחוק תמונה זו מהגלריה?', async () => {
+    await deleteDoc(doc(db, "gallery", id));
+  });
+};
+
+window.updateGalleryCategory = async function(id, newCat) {
+  await updateDoc(doc(db, "gallery", id), { cat: newCat });
+};
+
+// ── HERO UI & ACTIONS ───────────────────────────────────
+window.handleHeroUpload = function(input) {
+  const f = input.files[0]; if(!f) return;
+  fileToDataUrl(f, url => {
+    document.getElementById('heroImgUrl').value = url;
+    const p = document.getElementById('heroImgPreview'); p.src = url; p.style.display = 'block';
+  });
+};
+window.previewHeroUrl = function() {
+  const url = document.getElementById('heroImgUrl').value.trim();
+  const p = document.getElementById('heroImgPreview');
+  p.src = url; p.style.display = url ? 'block' : 'none';
+};
+
+window.handleAbout1Upload = function(input) {
+  const f = input.files[0]; if(!f) return;
+  fileToDataUrl(f, url => {
+    document.getElementById('about1Url').value = url;
+    const p = document.getElementById('about1Preview'); p.src = url; p.style.display = 'block';
+  });
+};
+window.previewAbout1 = function() {
+  const url = document.getElementById('about1Url').value.trim();
+  const p = document.getElementById('about1Preview'); p.src = url; p.style.display = url ? 'block' : 'none';
+};
+
+window.handleAbout2Upload = function(input) {
+  const f = input.files[0]; if(!f) return;
+  fileToDataUrl(f, url => {
+    document.getElementById('about2Url').value = url;
+    const p = document.getElementById('about2Preview'); p.src = url; p.style.display = 'block';
+  });
+};
+window.previewAbout2 = function() {
+  const url = document.getElementById('about2Url').value.trim();
+  const p = document.getElementById('about2Preview'); p.src = url; p.style.display = url ? 'block' : 'none';
+};
+
+function loadHeroForm() {
+  const s = SETTINGS;
+  const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+  
+  setVal('heroLine1', s.hero?.titleLine1);
+  setVal('heroLine2', s.hero?.titleLine2);
+  setVal('heroSub', s.hero?.sub);
+  
   if(s.heroImage){
-    const p=document.getElementById('heroImgPreview');
-    p.src=s.heroImage;p.style.display='block';
-    document.getElementById('heroImgUrl').value=s.heroImage;
+    const p = document.getElementById('heroImgPreview');
+    if(p) { p.src = s.heroImage; p.style.display = 'block'; }
+    setVal('heroImgUrl', s.heroImage);
   }
   if(s.aboutImg1){
-    const p=document.getElementById('about1Preview');
-    p.src=s.aboutImg1;p.style.display='block';
-    document.getElementById('about1Url').value=s.aboutImg1;
+    const p = document.getElementById('about1Preview');
+    if(p) { p.src = s.aboutImg1; p.style.display = 'block'; }
+    setVal('about1Url', s.aboutImg1);
   }
   if(s.aboutImg2){
-    const p=document.getElementById('about2Preview');
-    p.src=s.aboutImg2;p.style.display='block';
-    document.getElementById('about2Url').value=s.aboutImg2;
+    const p = document.getElementById('about2Preview');
+    if(p) { p.src = s.aboutImg2; p.style.display = 'block'; }
+    setVal('about2Url', s.aboutImg2);
   }
 }
 
-function saveHero(){
-  const s=getSettings();
-  s.hero={
-    titleLine1:document.getElementById('heroLine1').value,
-    titleLine2:document.getElementById('heroLine2').value,
-    sub:document.getElementById('heroSub').value,
+window.saveHero = async function() {
+  const heroData = {
+    heroImage: document.getElementById('heroImgUrl').value,
+    aboutImg1: document.getElementById('about1Url').value,
+    aboutImg2: document.getElementById('about2Url').value,
+    hero: {
+      titleLine1: document.getElementById('heroLine1').value,
+      titleLine2: document.getElementById('heroLine2').value,
+      sub: document.getElementById('heroSub').value,
+    }
   };
-  s.heroImage=document.getElementById('heroImgUrl').value;
-  s.aboutImg1=document.getElementById('about1Url').value;
-  s.aboutImg2=document.getElementById('about2Url').value;
-  lsSet(SETTINGS_KEY,s);
-  const ok=document.getElementById('heroSaveOk');
-  ok.classList.add('show');
-  setTimeout(()=>ok.classList.remove('show'),4000);
+  
+  await setDoc(settingsRef, heroData, { merge: true });
+  
+  const ok = document.getElementById('heroSaveOk');
+  if(ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 4000); }
+};
+
+// ── SETTINGS UI & ACTIONS ───────────────────────────────
+function loadSettingsForm() {
+  const s = SETTINGS;
+  const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+  
+  setVal('s-phone', s.phone);
+  setVal('s-whatsapp', s.whatsapp);
+  setVal('s-email', s.email);
+  setVal('s-wamsg', s.whatsappMsg);
 }
 
-// ── SETTINGS ───────────────────────────────────────────
-function loadSettingsForm(){
-  const s=getSettings();
-  document.getElementById('s-phone').value=s.phone||'';
-  document.getElementById('s-whatsapp').value=s.whatsapp||'';
-  document.getElementById('s-email').value=s.email||'';
-  document.getElementById('s-wamsg').value=s.whatsappMsg||'';
-}
+window.saveSettings = async function() {
+  const settingsData = {
+    phone: document.getElementById('s-phone').value,
+    whatsapp: document.getElementById('s-whatsapp').value,
+    email: document.getElementById('s-email').value,
+    whatsappMsg: document.getElementById('s-wamsg').value
+  };
 
-function saveSettings(){
-  const s=getSettings();
-  s.phone=document.getElementById('s-phone').value;
-  s.whatsapp=document.getElementById('s-whatsapp').value;
-  s.email=document.getElementById('s-email').value;
-  s.whatsappMsg=document.getElementById('s-wamsg').value;
-  lsSet(SETTINGS_KEY,s);
+  await setDoc(settingsRef, settingsData, { merge: true });
 
-  // Password change
-  const oldPass=document.getElementById('s-passold').value;
-  const newPass=document.getElementById('s-passnew').value;
-  if(oldPass&&newPass){
-    if(oldPass===getPass()){
-      localStorage.setItem(PASS_KEY,newPass);
-      document.getElementById('s-passold').value='';
-      document.getElementById('s-passnew').value='';
+  const oldPass = document.getElementById('s-passold').value;
+  const newPass = document.getElementById('s-passnew').value;
+  if(oldPass && newPass) {
+    if(oldPass === getPass()){
+      sessionStorage.setItem('cialo:pass', newPass); 
+      document.getElementById('s-passold').value = '';
+      document.getElementById('s-passnew').value = '';
     } else {
       alert('הסיסמה הנוכחית שגויה');
       return;
     }
   }
 
-  const ok=document.getElementById('settingsSaveOk');
-  ok.classList.add('show');
-  setTimeout(()=>ok.classList.remove('show'),3000);
-}
-
-function resetSettings(){
-  confirm2('לאפס את כל ההגדרות?',()=>{
-    localStorage.removeItem(SETTINGS_KEY);
-    loadSettingsForm();
-  });
-}
-
-// ── INIT ───────────────────────────────────────────────
-function init(){
-  renderBookings();
-  renderGalleryAdmin();
-  loadHeroForm();
-  loadSettingsForm();
-}
-
-show();
-</script>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  getDocs 
-} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
-  authDomain: "cialo-boutique.firebaseapp.com",
-  projectId: "cialo-boutique",
-  storageBucket: "cialo-boutique.firebasestorage.app",
-  messagingSenderId: "3716819450",
-  appId: "1:3716819450:web:69e9d4b528b23893efdc43"
+  const ok = document.getElementById('settingsSaveOk');
+  if(ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 3000); }
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-window.db = db;
-window.firebaseAPI = { doc, setDoc, collection, addDoc, onSnapshot, getDocs };
+// Start
+show();
 </script>
-<input id="title" placeholder="כותרת אתר">
-<button onclick="saveSite()">שמור</button>
 </body>
 </html>

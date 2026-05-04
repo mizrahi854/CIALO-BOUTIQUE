@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>ניהול | Cialo Boutique</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500&family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet" />
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0d0a;--bg2:#15120e;--bg3:#1c1814;
+  --line:#2a241d;--text:#ece4d6;--muted:#847866;
+  --gold:#c9a35a;--gold2:#e3c587;--green:#25d366;--red:#e55;
+}
+body{font-family:Heebo,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+
+/* ── AUTH ── */
+#authScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.auth-box{background:var(--bg2);border:1px solid var(--line);padding:3rem;max-width:380px;width:100%;text-align:center}
+.auth-logo{height:80px;width:auto;margin-bottom:1.5rem}
+.auth-title{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--gold);margin-bottom:.25rem}
+.auth-sub{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:2rem}
+.auth-box input{width:100%;background:transparent;border:1px solid var(--line);color:var(--text);padding:.85rem 1rem;font:inherit;margin-bottom:1rem;text-align:center;letter-spacing:.15em}
+.auth-box input:focus{outline:none;border-color:var(--gold)}
+.auth-err{color:var(--red);font-size:.82rem;margin-bottom:.75rem;display:none}
+.back-link{display:block;margin-top:1.25rem;font-size:.78rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;text-decoration:none;transition:color .2s}
+.back-link:hover{color:var(--gold)}
+
+/* ── ADMIN LAYOUT ── */
+#adminScreen{display:none;min-height:100vh}
+.admin-header{
+  position:sticky;top:0;z-index:50;
+  background:rgba(15,13,10,.97);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.5rem;height:58px;
+}
+.header-left{display:flex;align-items:center;gap:1rem}
+.header-logo{height:36px;width:auto}
+.header-brand{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--gold2)}
+.header-brand small{font-family:Heebo,sans-serif;font-weight:300;font-size:.65rem;color:var(--muted);margin-right:.4rem}
+.tab-nav{display:flex;height:100%}
+.tab-btn{
+  display:flex;align-items:center;gap:.4rem;padding:0 1.1rem;
+  font-family:Heebo,sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;height:100%;transition:all .2s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--gold2);border-bottom-color:var(--gold)}
+.header-right{display:flex;align-items:center;gap:1rem}
+.header-right a,.header-right button{font-family:Heebo,sans-serif;font-size:.75rem;color:var(--muted);background:none;border:none;cursor:pointer;transition:color .2s;text-decoration:none}
+.header-right a:hover{color:var(--text)}
+.header-right button:hover{color:var(--red)}
+
+/* Mobile tabs */
+.mobile-tabs{display:none;overflow-x:auto;background:var(--bg2);border-bottom:1px solid var(--line)}
+@media(max-width:768px){.tab-nav{display:none}.mobile-tabs{display:flex}}
+.m-tab{flex-shrink:0;padding:.7rem 1rem;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s}
+.m-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+.admin-main{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+.page-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--gold2);margin-bottom:.35rem}
+.gold-bar{width:2rem;height:1.5px;background:var(--gold);margin-bottom:2rem}
+
+/* ── TAB CONTENT ── */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:.4rem;border:none;padding:.65rem 1.4rem;font-family:Heebo,sans-serif;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--bg);font-weight:500}
+.btn-gold:hover{filter:brightness(1.1)}
+.btn-outline{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+.btn-outline:hover{background:var(--gold);color:var(--bg)}
+.btn-red{background:transparent;color:var(--red);border:1px solid var(--red);padding:.4rem .85rem;font-size:.7rem}
+.btn-red:hover{background:var(--red);color:#fff}
+.btn-sm{padding:.4rem .9rem;font-size:.7rem}
+.btn-green{background:transparent;color:var(--green);border:1px solid var(--green);padding:.4rem .85rem;font-size:.7rem}
+.btn-green:hover{background:var(--green);color:var(--bg)}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-box{background:var(--bg2);border:1px solid var(--line);padding:1.25rem 1.5rem}
+.stat-label{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.stat-val{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--gold)}
+
+/* ── FILTER PILLS ── */
+.filter-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.fpill{background:transparent;border:1px solid var(--line);padding:.35rem .9rem;font-family:Heebo,sans-serif;font-size:.72rem;color:var(--muted);cursor:pointer;transition:all .2s}
+.fpill:hover,.fpill.active{background:var(--bg3);border-color:var(--gold);color:var(--gold)}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;background:var(--bg2);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;min-width:700px}
+table th{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);padding:.85rem 1rem;text-align:right;background:var(--bg3);border-bottom:1px solid var(--line);font-weight:400}
+table td{padding:.8rem 1rem;font-size:.85rem;color:var(--text);border-bottom:1px solid var(--line);text-align:right}
+table tr:hover td{background:rgba(201,163,90,.04)}
+table tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:.2rem .7rem;font-size:.68rem;border:1px solid;font-family:Heebo,sans-serif;letter-spacing:.05em}
+.badge-new{background:#1a3040;color:#5bc8f5;border-color:#2a4a60}
+.badge-contacted{background:#1a3020;color:var(--green);border-color:#2a5030}
+.badge-done{background:#2a2416;color:var(--gold);border-color:#3a3420}
+.badge-cancelled{background:#2a1414;color:var(--red);border-color:#3a2020}
+.act-btns{display:flex;gap:.3rem;align-items:center;justify-content:flex-end}
+
+/* ── FORM ── */
+.form-section{background:var(--bg2);border:1px solid var(--line);padding:1.75rem 2rem;margin-bottom:1.5rem}
+.form-section h3{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--gold2);margin-bottom:1.25rem;font-weight:400}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:600px){.field-grid{grid-template-columns:1fr}}
+.field-full{grid-column:1/-1}
+.field label{display:block;font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:.35rem}
+.field input,.field textarea,.field select{
+  width:100%;background:transparent;border:1px solid var(--line);
+  color:var(--text);padding:.75rem .9rem;font:inherit;font-size:.9rem;
+}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--gold)}
+.field textarea{resize:vertical;min-height:80px}
+.save-ok{display:none;color:var(--green);font-size:.85rem;margin-top:.75rem;align-items:center;gap:.4rem}
+.save-ok.show{display:flex}
+
+/* ── GALLERY ADMIN ── */
+.gallery-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
+.gallery-add-panel{background:var(--bg2);border:1px solid var(--line);padding:1.5rem;margin-bottom:1.5rem;display:none}
+.gallery-add-panel.open{display:block}
+.gallery-add-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:.75rem;align-items:end}
+@media(max-width:640px){.gallery-add-grid{grid-template-columns:1fr}}
+.gallery-grid-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem}
+.g-card{background:var(--bg2);border:1px solid var(--line);overflow:hidden;position:relative}
+.g-card img{width:100%;height:140px;object-fit:cover;display:block}
+.g-card-body{padding:.75rem}
+.g-card-body p{font-size:.82rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.3rem}
+.g-del{position:absolute;top:.5rem;left:.5rem;background:rgba(15,13,10,.9);color:var(--red);border:1px solid var(--red);padding:.25rem .5rem;font-size:.7rem;cursor:pointer;opacity:0;transition:opacity .2s;font-family:Heebo,sans-serif}
+.g-card:hover .g-del{opacity:1}
+.g-del:hover{background:var(--red);color:#fff}
+
+/* עיצוב בחירת קטגוריה בגלריה */
+.g-cat-select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--line);
+    color: var(--gold);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    font-family: inherit;
+    margin-top: 0.4rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.g-cat-select:focus {
+    outline: none;
+    border-color: var(--gold);
+}
+
+/* ── IMAGE UPLOAD ── */
+.img-upload-area{
+  border:2px dashed var(--line);padding:2rem;text-align:center;
+  cursor:pointer;transition:border-color .2s;position:relative;
+}
+.img-upload-area:hover{border-color:var(--gold)}
+.img-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.img-upload-area p{font-size:.85rem;color:var(--muted)}
+.img-preview{max-height:120px;max-width:100%;margin:.75rem auto 0;display:block}
+
+/* ── CONFIRM ── */
+#confirmModal{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
+#confirmModal.open{display:flex}
+.confirm-box{background:var(--bg2);border:1px solid var(--line);padding:2rem;max-width:360px;width:90%;text-align:center}
+.confirm-box p{color:var(--text-soft,#b9ad97);margin-bottom:1.5rem}
+.confirm-btns{display:flex;gap:.75rem;justify-content:center}
+
+/* ── BOOKING DETAIL ── */
+#detailModal{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:1rem}
+#detailModal.open{display:flex}
+.detail-box{background:var(--bg2);border:1px solid var(--line);padding:2rem;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+.detail-box h3{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--gold2);margin-bottom:1.25rem;font-weight:400}
+.detail-row{display:flex;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);font-size:.88rem}
+.detail-row:last-child{border-bottom:none}
+.detail-row span:first-child{color:var(--muted);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase}
+.detail-row span:last-child{color:var(--text)}
+
+/* Note for the manager */
+.note-for-mgr{margin-top:1.25rem}
+.note-for-mgr label{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:.35rem}
+.note-for-mgr textarea{width:100%;background:transparent;border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;resize:vertical;min-height:70px}
+.note-for-mgr textarea:focus{outline:none;border-color:var(--gold)}
+</style>
+</head>
+<body>
+
+<!-- ── AUTH ── -->
+<div id="authScreen">
+  <div class="auth-box">
+    <img src="images/logo.png" alt="Cialo Boutique" class="auth-logo" />
+    <div class="auth-title">ניהול</div>
+    <div class="auth-sub">Cialo Boutique CMS</div>
+    <input type="password" id="passInput" placeholder="סיסמה" />
+    <div class="auth-err" id="authErr">סיסמה שגויה — נסו שוב</div>
+    <button class="btn btn-gold" style="width:100%;justify-content:center" onclick="doLogin()">כניסה</button>
+    <p style="font-size:.72rem;color:var(--muted);margin-top:.5rem">ברירת מחדל: cialo2026</p>
+    <a href="index.html" class="back-link">← חזרה לאתר</a>
+  </div>
+</div>
+
+<!-- ── ADMIN ── -->
+<div id="adminScreen">
+  <header class="admin-header">
+    <div class="header-left">
+      <img src="images/logo.png" alt="" class="header-logo" />
+      <span class="header-brand">Cialo <small>Admin</small></span>
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="bookings">📋 הזמנות</button>
+        <button class="tab-btn" data-tab="gallery">🖼 גלריה</button>
+        <button class="tab-btn" data-tab="hero">🌅 Hero</button>
+        <button class="tab-btn" data-tab="settings">⚙️ הגדרות</button>
+      </nav>
+    </div>
+    <div class="header-right">
+      <a href="index.html" target="_blank">🏠 אתר</a>
+      <button onclick="doLogout()">יציאה</button>
+    </div>
+  </header>
+  <div class="mobile-tabs">
+    <button class="m-tab active" data-tab="bookings">הזמנות</button>
+    <button class="m-tab" data-tab="gallery">גלריה</button>
+    <button class="m-tab" data-tab="hero">Hero</button>
+    <button class="m-tab" data-tab="settings">הגדרות</button>
+  </div>
+
+  <main class="admin-main">
+
+    <!-- ════════ BOOKINGS ════════ -->
+    <div class="tab-content active" id="tab-bookings">
+      <h2 class="page-title">הזמנות</h2>
+      <div class="gold-bar"></div>
+      <div class="stats-row" id="bookStats"></div>
+      <div class="filter-row" id="bookFilter">
+        <button class="fpill active" data-f="הכל">הכל</button>
+        <button class="fpill" data-f="חדש">חדש</button>
+        <button class="fpill" data-f="יצרנו קשר">יצרנו קשר</button>
+        <button class="fpill" data-f="סגור">סגור</button>
+        <button class="fpill" data-f="בוטל">בוטל</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>שם</th><th>טלפון</th><th>כניסה</th><th>יציאה</th>
+              <th>אורחים</th><th>אירוע</th><th>סטטוס</th><th>תאריך קבלה</th><th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="bookBody"></tbody>
+        </table>
+      </div>
+      <div id="bookEmpty" style="display:none;text-align:center;padding:3rem;color:var(--muted)">
+        <p style="font-size:1rem">אין הזמנות עדיין</p>
+        <p style="font-size:.82rem;margin-top:.5rem">כשאורחים ישלחו טופס — הם יופיעו כאן</p>
+      </div>
+    </div>
+
+    <!-- ════════ GALLERY ════════ -->
+    <div class="tab-content" id="tab-gallery">
+      <h2 class="page-title">גלריה</h2>
+      <div class="gold-bar"></div>
+      <div class="gallery-toolbar">
+        <span id="galCount" style="font-size:.82rem;color:var(--muted)"></span>
+        <button class="btn btn-gold btn-sm" onclick="toggleAddPanel()">+ הוסף תמונה</button>
+      </div>
+      <div class="gallery-add-panel" id="addPanel">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--gold2);margin-bottom:1rem;font-weight:400">הוספת תמונה</h3>
+        <div class="gallery-add-grid">
+          <div class="field">
+            <label>העלאת תמונה / הדבקת URL</label>
+            <div class="img-upload-area" id="uploadArea">
+              <input type="file" accept="image/*" id="imgFileInput" onchange="handleFileUpload()" />
+              <p>לחצו או גררו תמונה לכאן</p>
+            </div>
+            <input type="text" id="g-url" placeholder="או הדביקו כתובת URL..." style="margin-top:.5rem;background:transparent;border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;width:100%" oninput="previewUrl()" />
+            <img id="imgPreview" class="img-preview" style="display:none" />
+          </div>
+          <div class="field">
+            <label>כותרת</label>
+            <input type="text" id="g-title" placeholder="שם התמונה" />
+            <label style="margin-top:.75rem">קטגוריה</label>
+            <select id="g-cat" style="background:var(--bg);border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;width:100%">
+              <option>בריכה</option><option>ג'קוזי</option><option>חדרים</option>
+              <option>נוף</option><option>כללי</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;justify-content:flex-end">
+            <button class="btn btn-gold" onclick="addGalleryItem()">הוסף לגלריה</button>
+            <button class="btn btn-outline" onclick="toggleAddPanel()">ביטול</button>
+          </div>
+        </div>
+      </div>
+      <div class="gallery-grid-admin" id="galGrid"></div>
+      <div id="galEmpty" style="display:none;text-align:center;padding:3rem;color:var(--muted)">אין תמונות</div>
+    </div>
+
+    <!-- ════════ HERO ════════ -->
+    <div class="tab-content" id="tab-hero">
+      <h2 class="page-title">עריכת Hero & תמונות</h2>
+      <div class="gold-bar"></div>
+
+      <div class="form-section">
+        <h3>תמונת Hero ראשית</h3>
+        <div class="field field-full" style="margin-bottom:1rem">
+          <label>תמונה (העלאה או URL)</label>
+          <div class="img-upload-area" style="margin-bottom:.5rem">
+            <input type="file" accept="image/*" onchange="handleHeroUpload(this)" />
+            <p>לחצו לבחירת תמונה</p>
+          </div>
+          <input type="text" id="heroImgUrl" placeholder="או הדביקו URL..." style="background:transparent;border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;width:100%" oninput="previewHeroUrl()" />
+          <img id="heroImgPreview" style="max-height:120px;margin-top:.5rem;display:none" />
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>טקסט Hero</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label>שורה ראשונה</label>
+            <input type="text" id="heroLine1" value="חוויית בוטיק" />
+          </div>
+          <div class="field">
+            <label>שורה שניה (נטויה)</label>
+            <input type="text" id="heroLine2" value="פרטית מול הכנרת" />
+          </div>
+          <div class="field field-full">
+            <label>תיאור קצר</label>
+            <textarea id="heroSub" rows="2">ריזורט יוקרתי בנוף כנרת — בריכה מחוממת, ג'קוזי ספא, חדרי סוויטה ונוף עוצר נשימה</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>תמונות סקציית "אודות"</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label>תמונה ראשית (גדולה)</label>
+            <div class="img-upload-area" style="margin-bottom:.5rem">
+              <input type="file" accept="image/*" onchange="handleAbout1Upload(this)" />
+              <p>לחצו לבחירה</p>
+            </div>
+            <input type="text" id="about1Url" placeholder="URL" style="background:transparent;border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;width:100%" oninput="previewAbout1()" />
+            <img id="about1Preview" style="max-height:100px;margin-top:.5rem;display:none" />
+          </div>
+          <div class="field">
+            <label>תמונה שניה (קטנה)</label>
+            <div class="img-upload-area" style="margin-bottom:.5rem">
+              <input type="file" accept="image/*" onchange="handleAbout2Upload(this)" />
+              <p>לחצו לבחירה</p>
+            </div>
+            <input type="text" id="about2Url" placeholder="URL" style="background:transparent;border:1px solid var(--line);color:var(--text);padding:.65rem .85rem;font:inherit;width:100%" oninput="previewAbout2()" />
+            <img id="about2Preview" style="max-height:100px;margin-top:.5rem;display:none" />
+          </div>
+        </div>
+      </div>
+
+      
+
+      <button class="btn btn-gold" onclick="saveHero()">💾 שמור שינויים</button>
+      <div class="save-ok" id="heroSaveOk">✓ נשמר — רענן את הדף הראשי לראות שינויים</div>
+    </div>
+
+    <!-- ════════ SETTINGS ════════ -->
+    <div class="tab-content" id="tab-settings">
+      <h2 class="page-title">הגדרות</h2>
+      <div class="gold-bar"></div>
+
+      <div class="form-section" style="max-width:580px">
+        <h3>פרטי קשר</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label>טלפון</label>
+            <input type="text" id="s-phone" />
+          </div>
+          <div class="field">
+            <label>WhatsApp (קוד מדינה + מספר)</label>
+            <input type="text" id="s-whatsapp" placeholder="972501234567" />
+          </div>
+          <div class="field field-full">
+            <label>אימייל</label>
+            <input type="email" id="s-email" />
+          </div>
+          <div class="field field-full">
+            <label>הודעת WhatsApp ברירת מחדל</label>
+            <textarea id="s-wamsg" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" style="max-width:580px">
+        <h3>שינוי סיסמה</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label>סיסמה נוכחית</label>
+            <input type="password" id="s-passold" />
+          </div>
+          <div class="field">
+            <label>סיסמה חדשה</label>
+            <input type="password" id="s-passnew" />
+          </div>
+        </div>
+        <p style="font-size:.75rem;color:var(--muted);margin-top:.5rem">ברירת מחדל: cialo2026</p>
+      </div>
+
+      <button class="btn btn-gold" onclick="saveSettings()">💾 שמור הגדרות</button>
+      <button class="btn btn-outline" style="margin-right:.75rem" onclick="resetSettings()">איפוס</button>
+      <div class="save-ok" id="settingsSaveOk">✓ נשמר בהצלחה!</div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── BOOKING DETAIL MODAL ── -->
+<div id="detailModal">
+  <div class="detail-box">
+    <h3>פרטי הזמנה</h3>
+    <div id="detailContent"></div>
+    <div class="note-for-mgr">
+      <label>הערה פנימית (לא מוצגת לאורח)</label>
+      <textarea id="detailNote" rows="2"></textarea>
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
+      <button class="btn btn-gold btn-sm" onclick="saveDetailNote()">שמור הערה</button>
+      <button class="btn btn-outline btn-sm" onclick="closeDetail()">סגור</button>
+      <a id="detailWa" href="#" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;text-decoration:none">📱 שלח WhatsApp</a>
+      <a id="detailCall" href="#" class="btn btn-sm" style="background:transparent;border:1px solid #5bc8f5;color:#5bc8f5;text-decoration:none">📞 חייג</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONFIRM MODAL ── -->
+<div id="confirmModal">
+  <div class="confirm-box">
+    <p id="confirmMsg">האם למחוק?</p>
+    <div class="confirm-btns">
+      <button class="btn btn-gold" id="confirmOkBtn">אישור</button>
+      <button class="btn btn-outline" onclick="closeConfirm()">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────
+const SETTINGS_KEY = 'cialo:settings:v2';
+const BOOKINGS_KEY = 'cialo:bookings:v1';
+const GALLERY_KEY  = 'cialo:gallery:v1';
+const PASS_KEY     = 'cialo:pass';
+const DEFAULT_PASS = 'cialo2026';
+
+const DEFAULT_GALLERY = [
+  {id:'g1',file:'vila_681_331148_JmHVx7E.jpg',title:'בריכה מחוממת',cat:'בריכה'},
+  {id:'g2',file:'vila_681_331149_hE9uJeR.jpg',title:'נוף לכנרת',cat:'נוף'},
+  {id:'g3',file:'vila_681_331150_CdQLDNq.jpg',title:'כנרת מהמרפסת',cat:'נוף'},
+  {id:'g4',file:'vila_681_331151_LSsMEj1.jpg',title:'חדר שינה',cat:'חדרים'},
+  {id:'g5',file:'vila_681_331152_v6SV3uB.jpg',title:'סוויטה',cat:'חדרים'},
+  {id:'g6',file:'vila_681_331153_zDbZq9y.jpg',title:'חדר נוסף',cat:'חדרים'},
+  {id:'g7',file:'vila_681_331154_ukygqEC.jpg',title:'ג\'קוזי ספא',cat:'ג\'קוזי'},
+  {id:'g8',file:'vila_681_331155_A49sLxn.jpg',title:'ג\'קוזי עם נוף',cat:'ג\'קוזי'},
+  {id:'g9',file:'vila_681_331156_N3WAnES.jpg',title:'בריכה בלילה',cat:'בריכה'},
+  {id:'g10',file:'vila_681_331157_bEtKsEQ.jpg',title:'שחייה פרטית',cat:'בריכה'},
+  {id:'g11',file:'vila_681_331158_1UV49D3.jpg',title:'חדר מאסטר',cat:'חדרים'},
+  {id:'g12',file:'vila_681_331159_PShTfwt.jpg',title:'חדר ילדים',cat:'חדרים'},
+  {id:'g13',file:'vila_681_331160_KTHuqfu.jpg',title:'חצר הוילה',cat:'כללי'},
+  {id:'g14',file:'vila_681_331161_VjMwqmc.jpg',title:'חדר זוגי',cat:'חדרים'},
+  {id:'g15',file:'vila_681_331162_FHg773s.jpg',title:'כניסה',cat:'כללי'},
+  {id:'g16',file:'vila_681_331163_trQ91Yf.jpg',title:'סלון',cat:'כללי'},
+  {id:'g17',file:'vila_681_331164_QHEn94q.jpg',title:'סוויטת זוגות',cat:'חדרים'},
+  {id:'g18',file:'vila_681_331165_9QsNHcA.jpg',title:'מטבח',cat:'כללי'},
+  {id:'g19',file:'vila_681_331166_AU1uV1a.jpg',title:'שקיעה',cat:'נוף'},
+  {id:'g20',file:'vila_681_331167_TkvD4ZK.jpg',title:'אזור בריכה',cat:'בריכה'},
+  {id:'g21',file:'vila_681_331168_a3GM41u.jpg',title:'ספא',cat:'ג\'קוזי'},
+  {id:'g22',file:'vila_681_331169_EMs9XU6.jpg',title:'הוילה מבחוץ',cat:'כללי'},
+  {id:'g23',file:'vila_681_331170_geC6AuF.jpg',title:'גלריה',cat:'נוף'},
+  {id:'g24',file:'vila_681_331171_m6k28dZ.jpg',title:'חדר נוסף',cat:'חדרים'},
+  {id:'g25',file:'vila_681_331179_zJTfTpM.jpg',title:'חדר משפחתי',cat:'חדרים'},
+  {id:'g26',file:'vila_681_331185_EpcV2Ms.jpg',title:'סוויטת אורחים',cat:'חדרים'},
+  {id:'g27',file:'vila_681_331200_EPjxLmP.jpg',title:'חוץ',cat:'כללי'},
+  {id:'g28',file:'vila_681_331201_jVtvTts.jpg',title:'נוף ערב',cat:'נוף'},
+  {id:'g29',file:'vila_681_331206_NCUHvgt.jpg',title:'כנרת',cat:'נוף'},
+];
+
+const DEFAULT_SETTINGS = {
+  phone:'050-1234567',whatsapp:'972501234567',
+  email:'info@villacialoboutique.com',
+  whatsappMsg:'שלום, אני מעוניין/ת לשמוע פרטים על Villa Cialo Boutique',
+  hero:{titleLine1:'חוויית בוטיק',titleLine2:'פרטית מול הכנרת',sub:'ריזורט יוקרתי בנוף כנרת — בריכה מחוממת, ג\'קוזי ספא, חדרי סוויטה ונוף עוצר נשימה'},
+  heroImage:'',aboutImg1:'',aboutImg2:'',
+};
+
+// ── HELPERS ────────────────────────────────────────────
+const lsGet = (k,d) => { try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d} };
+const lsSet = (k,v) => localStorage.setItem(k,JSON.stringify(v));
+const getSettings  = () => ({...DEFAULT_SETTINGS,...lsGet(SETTINGS_KEY,{})});
+const getBookings  = () => lsGet(BOOKINGS_KEY,[]);
+const saveBookings = b  => lsSet(BOOKINGS_KEY,b);
+const getGallery   = () => { const g=lsGet(GALLERY_KEY,null); return g||DEFAULT_GALLERY; };
+const saveGallery  = g  => lsSet(GALLERY_KEY,g);
+const getPass      = () => localStorage.getItem(PASS_KEY)||DEFAULT_PASS;
+
+function imgSrc(item){
+  if(!item.file)return '';
+  if(item.file.startsWith('data:')||item.file.startsWith('http'))return item.file;
+  return 'images/'+item.file;
+}
+
+// ── AUTH ───────────────────────────────────────────────
+function isAuthed(){return sessionStorage.getItem('cialo:auth')==='1'}
+function doLogin(){
+  const p=document.getElementById('passInput').value;
+  if(p===getPass()){
+    sessionStorage.setItem('cialo:auth','1');
+    show();
+  } else {
+    const err=document.getElementById('authErr');
+    err.style.display='block';
+    document.getElementById('passInput').value='';
+    setTimeout(()=>err.style.display='none',3000);
+  }
+}
+function doLogout(){sessionStorage.removeItem('cialo:auth');show()}
+function show(){
+  if(isAuthed()){
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('adminScreen').style.display='block';
+    init();
+  } else {
+    document.getElementById('authScreen').style.display='flex';
+    document.getElementById('adminScreen').style.display='none';
+  }
+}
+document.getElementById('passInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// ── TABS ───────────────────────────────────────────────
+document.querySelectorAll('.tab-btn,.m-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const t=btn.dataset.tab;
+    document.querySelectorAll('.tab-btn,.m-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+t));
+  });
+});
+
+// ── CONFIRM ────────────────────────────────────────────
+let confirmCb=null;
+function confirm2(msg,cb){
+  document.getElementById('confirmMsg').textContent=msg;
+  document.getElementById('confirmModal').classList.add('open');
+  confirmCb=cb;
+}
+function closeConfirm(){document.getElementById('confirmModal').classList.remove('open');confirmCb=null}
+document.getElementById('confirmOkBtn').onclick=()=>{if(confirmCb)confirmCb();closeConfirm()};
+document.getElementById('confirmModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeConfirm()});
+
+// ── BOOKING DETAIL ─────────────────────────────────────
+let detailBookingId=null;
+function openDetail(id){
+  const bookings=getBookings();
+  const b=bookings.find(x=>x.id===id);
+  if(!b)return;
+  detailBookingId=id;
+  const S=getSettings();
+  const waMsg=`*Villa Cialo Boutique*\nשלום ${b.name},\n`;
+  document.getElementById('detailWa').href=`https://wa.me/${b.phone.replace(/[^\d]/,'')}?text=${encodeURIComponent(waMsg)}`;
+  document.getElementById('detailCall').href=`tel:${b.phone.replace(/[^\d+]/g,'')}`;
+  document.getElementById('detailNote').value=b.note||'';
+  document.getElementById('detailContent').innerHTML=`
+    <div class="detail-row"><span>שם</span><span>${b.name||'-'}</span></div>
+    <div class="detail-row"><span>טלפון</span><span>${b.phone||'-'}</span></div>
+    <div class="detail-row"><span>כניסה</span><span>${b.checkin||'-'}</span></div>
+    <div class="detail-row"><span>יציאה</span><span>${b.checkout||'-'}</span></div>
+    <div class="detail-row"><span>אורחים</span><span>${b.guests||'-'}</span></div>
+    <div class="detail-row"><span>אירוע</span><span>${b.event||'-'}</span></div>
+    <div class="detail-row"><span>הערות אורח</span><span>${b.notes||'-'}</span></div>
+    <div class="detail-row"><span>התקבל</span><span>${new Date(b.createdAt).toLocaleString('he-IL')}</span></div>
+    <div class="detail-row"><span>סטטוס</span><span>${b.status}</span></div>
+  `;
+  document.getElementById('detailModal').classList.add('open');
+}
+function saveDetailNote(){
+  const bookings=getBookings();
+  const idx=bookings.findIndex(x=>x.id===detailBookingId);
+  if(idx>=0){bookings[idx].note=document.getElementById('detailNote').value;saveBookings(bookings);}
+  closeDetail();
+  renderBookings();
+}
+function closeDetail(){document.getElementById('detailModal').classList.remove('open');detailBookingId=null}
+document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDetail()});
+
+// ── BOOKINGS ───────────────────────────────────────────
+const STATUS_CLASS={חדש:'badge-new','יצרנו קשר':'badge-contacted','סגור':'badge-done','בוטל':'badge-cancelled'};
+let bookFilter='הכל';
+
+function renderBookings(){
+  const all=getBookings();
+  // Stats
+  const neu=all.filter(b=>b.status==='חדש').length;
+  document.getElementById('bookStats').innerHTML=`
+    <div class="stat-box"><div class="stat-label">סה"כ הזמנות</div><div class="stat-val">${all.length}</div></div>
+    <div class="stat-box"><div class="stat-label">חדשות</div><div class="stat-val" style="color:var(--gold2)">${neu}</div></div>
+    <div class="stat-box"><div class="stat-label">יצרנו קשר</div><div class="stat-val">${all.filter(b=>b.status==='יצרנו קשר').length}</div></div>
+    <div class="stat-box"><div class="stat-label">סגורות</div><div class="stat-val" style="color:var(--green)">${all.filter(b=>b.status==='סגור').length}</div></div>
+  `;
+  const list=bookFilter==='הכל'?all:all.filter(b=>b.status===bookFilter);
+  const body=document.getElementById('bookBody');
+  const empty=document.getElementById('bookEmpty');
+  if(list.length===0){body.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  body.innerHTML=list.map(b=>`
+    <tr>
+      <td><strong>${b.name||'-'}</strong></td>
+      <td>${b.phone||'-'}</td>
+      <td>${b.checkin||'-'}</td>
+      <td>${b.checkout||'-'}</td>
+      <td style="text-align:center">${b.guests||'-'}</td>
+      <td>${b.event||'-'}</td>
+      <td><span class="badge ${STATUS_CLASS[b.status]||'badge-new'}">${b.status}</span></td>
+      <td style="font-size:.75rem;color:var(--muted)">${new Date(b.createdAt).toLocaleDateString('he-IL')}</td>
+      <td>
+        <div class="act-btns">
+          <button class="btn btn-sm" style="background:transparent;border:1px solid var(--line);color:var(--text-soft,#b9ad97);font-size:.65rem" onclick="openDetail('${b.id}')">👁 פרטים</button>
+          <select style="background:var(--bg2);border:1px solid var(--line);color:var(--muted);padding:.3rem .5rem;font-size:.68rem;cursor:pointer" onchange="setStatus('${b.id}',this.value)">
+            <option value="">סטטוס</option>
+            <option value="חדש">חדש</option>
+            <option value="יצרנו קשר">יצרנו קשר</option>
+            <option value="סגור">סגור</option>
+            <option value="בוטל">בוטל</option>
+          </select>
+          <a href="https://wa.me/${(b.phone||'').replace(/[^\d]/g,'')}" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border:none;text-decoration:none;font-size:.68rem">WA</a>
+          <button class="btn btn-red btn-sm" onclick="deleteBooking('${b.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function setStatus(id,status){
+  if(!status)return;
+  const all=getBookings();
+  const idx=all.findIndex(b=>b.id===id);
+  if(idx>=0){all[idx].status=status;saveBookings(all);}
+  renderBookings();
+}
+function deleteBooking(id){
+  confirm2('למחוק הזמנה זו לצמיתות?',()=>{
+    saveBookings(getBookings().filter(b=>b.id!==id));
+    renderBookings();
+  });
+}
+
+document.getElementById('bookFilter').addEventListener('click',e=>{
+  const p=e.target.closest('.fpill');if(!p)return;
+  document.querySelectorAll('.fpill').forEach(x=>x.classList.remove('active'));
+  p.classList.add('active');
+  bookFilter=p.dataset.f;
+  renderBookings();
+});
+
+// ── GALLERY ────────────────────────────────────────────
+function renderGalleryAdmin(){
+  const gallery=getGallery();
+  const grid=document.getElementById('galGrid');
+  const empty=document.getElementById('galEmpty');
+  document.getElementById('galCount').textContent=`${gallery.length} תמונות בגלריה`;
+  if(!gallery.length){grid.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  
+  // הוספתי תפריט <select> על כל תמונה כדי שתוכל לשנות את הקטגוריה בקלות
+  grid.innerHTML=gallery.map(img=>`
+    <div class="g-card">
+      <img src="${imgSrc(img)}" alt="${img.title}" onerror="this.style.display='none'" />
+      <button class="g-del" onclick="deleteGalleryItem('${img.id}')">✕ מחק</button>
+      <div class="g-card-body">
+        <p>${img.title}</p>
+        <select class="g-cat-select" onchange="updateGalleryCategory('${img.id}', this.value)">
+          <option value="בריכה" ${img.cat === 'בריכה' ? 'selected' : ''}>בריכה</option>
+          <option value="ג'קוזי" ${img.cat === "ג'קוזי" ? 'selected' : ''}>ג'קוזי</option>
+          <option value="חדרים" ${img.cat === 'חדרים' ? 'selected' : ''}>חדרים</option>
+          <option value="נוף" ${img.cat === 'נוף' ? 'selected' : ''}>נוף</option>
+          <option value="כללי" ${img.cat === 'כללי' ? 'selected' : ''}>כללי</option>
+        </select>
+      </div>
+    </div>
+  `).join('');
+}
+
+// הפונקציה ששומרת את השינוי של הקטגוריה
+function updateGalleryCategory(id, newCat) {
+  const gallery = getGallery();
+  const imgIndex = gallery.findIndex(g => g.id === id);
+  if (imgIndex !== -1) {
+    gallery[imgIndex].cat = newCat;
+    saveGallery(gallery);
+  }
+}
+
+function toggleAddPanel(){
+  document.getElementById('addPanel').classList.toggle('open');
+  document.getElementById('g-url').value='';
+  document.getElementById('g-title').value='';
+  document.getElementById('imgPreview').style.display='none';
+}
+
+function handleFileUpload(){
+  const f=document.getElementById('imgFileInput').files[0];
+  if(!f)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const prev=document.getElementById('imgPreview');
+    prev.src=e.target.result;
+    prev.style.display='block';
+    document.getElementById('g-url').value=e.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function previewUrl(){
+  const url=document.getElementById('g-url').value.trim();
+  const prev=document.getElementById('imgPreview');
+  if(url){prev.src=url;prev.style.display='block';}
+  else prev.style.display='none';
+}
+
+function addGalleryItem(){
+  const file=document.getElementById('g-url').value.trim();
+  const title=document.getElementById('g-title').value.trim()||'תמונה';
+  const cat=document.getElementById('g-cat').value;
+  if(!file){alert('נא לבחור תמונה או להזין URL');return;}
+  const gallery=getGallery();
+  gallery.push({id:'g'+Date.now(),file,title,cat});
+  saveGallery(gallery);
+  toggleAddPanel();
+  renderGalleryAdmin();
+}
+
+function deleteGalleryItem(id){
+  confirm2('למחוק תמונה זו מהגלריה?',()=>{
+    saveGallery(getGallery().filter(g=>g.id!==id));
+    renderGalleryAdmin();
+  });
+}
+
+// ── HERO ───────────────────────────────────────────────
+function fileToDataUrl(file,cb){
+  const r=new FileReader();
+  r.onload=e=>cb(e.target.result);
+  r.readAsDataURL(file);
+}
+
+function handleHeroUpload(input){
+  const f=input.files[0];if(!f)return;
+  fileToDataUrl(f,url=>{
+    document.getElementById('heroImgUrl').value=url;
+    const p=document.getElementById('heroImgPreview');p.src=url;p.style.display='block';
+  });
+}
+function previewHeroUrl(){
+  const url=document.getElementById('heroImgUrl').value.trim();
+  const p=document.getElementById('heroImgPreview');
+  p.src=url;p.style.display=url?'block':'none';
+}
+function handleAbout1Upload(input){
+  const f=input.files[0];if(!f)return;
+  fileToDataUrl(f,url=>{
+    document.getElementById('about1Url').value=url;
+    const p=document.getElementById('about1Preview');p.src=url;p.style.display='block';
+  });
+}
+function previewAbout1(){
+  const url=document.getElementById('about1Url').value.trim();
+  const p=document.getElementById('about1Preview');p.src=url;p.style.display=url?'block':'none';
+}
+function handleAbout2Upload(input){
+  const f=input.files[0];if(!f)return;
+  fileToDataUrl(f,url=>{
+    document.getElementById('about2Url').value=url;
+    const p=document.getElementById('about2Preview');p.src=url;p.style.display='block';
+  });
+}
+function previewAbout2(){
+  const url=document.getElementById('about2Url').value.trim();
+  const p=document.getElementById('about2Preview');p.src=url;p.style.display=url?'block':'none';
+}
+
+function loadHeroForm(){
+  const s=getSettings();
+  document.getElementById('heroLine1').value=s.hero?.titleLine1||'';
+  document.getElementById('heroLine2').value=s.hero?.titleLine2||'';
+  document.getElementById('heroSub').value=s.hero?.sub||'';
+  if(s.heroImage){
+    const p=document.getElementById('heroImgPreview');
+    p.src=s.heroImage;p.style.display='block';
+    document.getElementById('heroImgUrl').value=s.heroImage;
+  }
+  if(s.aboutImg1){
+    const p=document.getElementById('about1Preview');
+    p.src=s.aboutImg1;p.style.display='block';
+    document.getElementById('about1Url').value=s.aboutImg1;
+  }
+  if(s.aboutImg2){
+    const p=document.getElementById('about2Preview');
+    p.src=s.aboutImg2;p.style.display='block';
+    document.getElementById('about2Url').value=s.aboutImg2;
+  }
+}
+
+function saveHero(){
+  const s=getSettings();
+  s.hero={
+    titleLine1:document.getElementById('heroLine1').value,
+    titleLine2:document.getElementById('heroLine2').value,
+    sub:document.getElementById('heroSub').value,
+  };
+  s.heroImage=document.getElementById('heroImgUrl').value;
+  s.aboutImg1=document.getElementById('about1Url').value;
+  s.aboutImg2=document.getElementById('about2Url').value;
+  lsSet(SETTINGS_KEY,s);
+  const ok=document.getElementById('heroSaveOk');
+  ok.classList.add('show');
+  setTimeout(()=>ok.classList.remove('show'),4000);
+}
+
+// ── SETTINGS ───────────────────────────────────────────
+function loadSettingsForm(){
+  const s=getSettings();
+  document.getElementById('s-phone').value=s.phone||'';
+  document.getElementById('s-whatsapp').value=s.whatsapp||'';
+  document.getElementById('s-email').value=s.email||'';
+  document.getElementById('s-wamsg').value=s.whatsappMsg||'';
+}
+
+function saveSettings(){
+  const s=getSettings();
+  s.phone=document.getElementById('s-phone').value;
+  s.whatsapp=document.getElementById('s-whatsapp').value;
+  s.email=document.getElementById('s-email').value;
+  s.whatsappMsg=document.getElementById('s-wamsg').value;
+  lsSet(SETTINGS_KEY,s);
+
+  // Password change
+  const oldPass=document.getElementById('s-passold').value;
+  const newPass=document.getElementById('s-passnew').value;
+  if(oldPass&&newPass){
+    if(oldPass===getPass()){
+      localStorage.setItem(PASS_KEY,newPass);
+      document.getElementById('s-passold').value='';
+      document.getElementById('s-passnew').value='';
+    } else {
+      alert('הסיסמה הנוכחית שגויה');
+      return;
+    }
+  }
+
+  const ok=document.getElementById('settingsSaveOk');
+  ok.classList.add('show');
+  setTimeout(()=>ok.classList.remove('show'),3000);
+}
+
+function resetSettings(){
+  confirm2('לאפס את כל ההגדרות?',()=>{
+    localStorage.removeItem(SETTINGS_KEY);
+    loadSettingsForm();
+  });
+}
+
+// ── INIT ───────────────────────────────────────────────
+function init(){
+  renderBookings();
+  renderGalleryAdmin();
+  loadHeroForm();
+  loadSettingsForm();
+}
+
+show();
+</script>
+</body>
+</html>

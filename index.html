@@ -408,13 +408,15 @@
 
 <script src="app.js"></script>
 
-<!-- סקריפטים של האתר -->
-<script src="app.js"></script>
-
-<!-- סקריפט Firebase לסנכרון נתונים (גלריה והגדרות) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  doc
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
@@ -428,150 +430,173 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// חשיפה ל-window כדי שהטופס יצירת קשר למטה יוכל לשלוח נתונים
 window.db = db;
-window.firebaseAPI = { collection, addDoc };
-window.SITE_SETTINGS = { whatsapp: '0505120820' }; // משתנה גלובלי שיחזיק את ההגדרות החיות
+import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, updateDoc } 
+from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
-// ── 1. טעינת הגלריה מ-Firebase ──
+window.db = db;
+
+// פונקציות מלאות (חשוב!)
+window.firebaseAPI = {
+  collection,
+  addDoc,
+  onSnapshot,
+  doc,
+  setDoc,
+  updateDoc
+};
+window.SITE_SETTINGS = { whatsapp: '0505120820' };
+
+/* ───────────── GALLERY SYNC ───────────── */
+
 onSnapshot(collection(db, "gallery"), (snap) => {
-  const gallery = snap.docs.map(d => d.data());
+  let gallery = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  const order = ['בריכה','ג\'קוזי','חדרים','נוף','כללי'];
+
+  gallery.sort((a, b) => {
+    return order.indexOf(a.cat || 'כללי') - order.indexOf(b.cat || 'כללי');
+  });
+
   const grid = document.getElementById('galleryGrid');
-  
-  if (grid && gallery.length > 0) {
-    grid.innerHTML = gallery.map(img => {
-      const imgSrc = img.file.startsWith('data:') || img.file.startsWith('http') ? img.file : 'images/' + img.file;
-      return `
+  if (!grid) return;
+
+  grid.innerHTML = gallery.map(img => {
+    const src = (img.file || '').startsWith('http') || (img.file || '').startsWith('data:')
+      ? img.file
+      : 'images/' + img.file;
+
+    return `
       <div class="gallery-item" data-cat="${img.cat || 'כללי'}">
-        <img src="${imgSrc}" 
-             alt="${img.title || ''}" 
-             loading="lazy" 
-             onclick="const lb=document.getElementById('lightbox'),lbi=document.getElementById('lbImg'); if(lb&&lbi){lbi.src=this.src; lb.classList.add('open');}" />
-      </div>`;
-    }).join('');
-  }
+        <img src="${src}" alt="${img.title || ''}" loading="lazy"
+          onclick="
+            const lb=document.getElementById('lightbox');
+            const lbi=document.getElementById('lbImg');
+            if(lb && lbi){ lbi.src=this.src; lb.classList.add('open'); }
+          ">
+      </div>
+    `;
+  }).join('');
 });
 
-// ── 2. טעינת ההגדרות והתמונות מ-Firebase ──
+
+/* ───────────── SETTINGS SYNC ───────────── */
+
 onSnapshot(doc(db, "settings", "site"), (snap) => {
-  if (snap.exists()) {
-    const s = snap.data();
-    window.SITE_SETTINGS = s; // מעדכן את המשתנה הגלובלי לשימוש בטופס
-    
-    // תמונות אודות ו-Hero
-    if(s.heroImage && document.getElementById('heroImg')) document.getElementById('heroImg').src = s.heroImage;
-    if(s.aboutImg1 && document.getElementById('aboutImg1')) document.getElementById('aboutImg1').src = s.aboutImg1;
-    if(s.aboutImg2 && document.getElementById('aboutImg2')) document.getElementById('aboutImg2').src = s.aboutImg2;
+  if (!snap.exists()) return;
 
-    // טקסטים - Hero
-    if(s.hero?.titleLine1 && document.getElementById('heroLine1')) document.getElementById('heroLine1').innerText = s.hero.titleLine1;
-    if(s.hero?.titleLine2 && document.getElementById('heroLine2')) document.getElementById('heroLine2').innerText = s.hero.titleLine2;
-    if(s.hero?.sub && document.getElementById('heroSub')) document.getElementById('heroSub').innerText = s.hero.sub;
+  const s = snap.data();
+  window.SITE_SETTINGS = s;
 
-    // פרטי קשר בפוטר
-    if(s.phone && document.getElementById('footPhone')) {
-        document.getElementById('footPhone').innerText = s.phone;
-        document.getElementById('footPhone').href = 'tel:' + s.phone.replace(/[^\d+]/g, '');
-    }
-    if(s.email && document.getElementById('footMail')) {
-        document.getElementById('footMail').innerText = s.email;
-        document.getElementById('footMail').href = 'mailto:' + s.email;
-    }
-    if(s.whatsapp && document.getElementById('footWa')) {
-        document.getElementById('footWa').href = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
-    }
-    
-    // עדכון כפתור וואטסאפ צף
-    if(s.whatsapp && document.getElementById('floatWa')) {
-        document.getElementById('floatWa').href = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
+  const setImg = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) el.src = val;
+  };
+
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) el.innerText = val;
+  };
+
+  setImg('heroImg', s.heroImage);
+  setImg('aboutImg1', s.aboutImg1);
+  setImg('aboutImg2', s.aboutImg2);
+
+  setText('heroLine1', s.hero?.titleLine1);
+  setText('heroLine2', s.hero?.titleLine2);
+  setText('heroSub', s.hero?.sub);
+
+  if (s.phone) {
+    const p = document.getElementById('footPhone');
+    if (p) {
+      p.innerText = s.phone;
+      p.href = 'tel:' + s.phone.replace(/[^\d+]/g, '');
     }
   }
-});
-</script>
 
-<!-- סקריפט התרגום ושליחת הטפסים -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const langBtn = document.getElementById('langBtn');
-    const formHe = document.getElementById('bookForm-he');
-    const formEn = document.getElementById('bookForm-en');
-    let currentLang = 'he';
-
-    // מנגנון תרגום (נשאר בדיוק כפי שהיה)
-    if (langBtn) {
-        langBtn.addEventListener('click', () => {
-            currentLang = currentLang === 'he' ? 'en' : 'he';
-            document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
-            document.documentElement.lang = currentLang;
-            langBtn.innerText = currentLang === 'he' ? 'EN' : 'עב';
-
-            document.querySelectorAll('.lang-he').forEach(el => el.style.display = currentLang === 'he' ? '' : 'none');
-            document.querySelectorAll('.lang-en').forEach(el => el.style.display = currentLang === 'en' ? '' : 'none');
-
-            if (currentLang === 'he') {
-                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = false);
-                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = true);
-            } else {
-                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = true);
-                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = false);
-            }
-        });
+  if (s.email) {
+    const m = document.getElementById('footMail');
+    if (m) {
+      m.innerText = s.email;
+      m.href = 'mailto:' + s.email;
     }
+  }
 
-    // שליחת טפסים ישירות ל-Firebase (בלי LocalStorage)
-    ['bookForm-he', 'bookForm-en'].forEach(formId => {
-        const form = document.getElementById(formId);
+  if (s.whatsapp) {
+    const wa = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
 
-        if (form) {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const fd = new FormData(e.target);
+    const f = document.getElementById('footWa');
+    if (f) f.href = wa;
 
-                const booking = {
-                    createdAt: new Date().toISOString(),
-                    status: "חדש",
-                    name: fd.get('name') || '',
-                    phone: fd.get('phone') || '',
-                    checkin: fd.get('checkin') || '',
-                    checkout: fd.get('checkout') || '',
-                    guests: fd.get('guests') || '',
-                    event: fd.get('event') || '',
-                    notes: fd.get('notes') || ''
-                };
+    const floatBtn = document.getElementById('floatWa');
+    if (floatBtn) floatBtn.href = wa;
+  }
+});
 
-                try {
-                    // שמירת ההזמנה במסד הנתונים
-                    await window.firebaseAPI.addDoc(
-                        window.firebaseAPI.collection(window.db, "bookings"),
-                        booking
-                    );
-                } catch (err) {
-                    console.error("שגיאה בשמירת נתונים ל-Firebase:", err);
-                }
 
-                // שליחה לוואטסאפ מבוסס על ההגדרות החיות שנמשכו מ-Firebase
-                const waNumber = window.SITE_SETTINGS?.whatsapp || '0505120820';
-                const msg = `הזמנה חדשה - Cialo Boutique\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin}\nיציאה: ${booking.checkout}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes}`;
+/* ───────────── BOOKING FORM ───────────── */
 
-                window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, "_blank");
+document.addEventListener("DOMContentLoaded", () => {
+  const forms = ['bookForm-he', 'bookForm-en'];
 
-                // הצגת הודעת הצלחה
-                form.style.display = 'none';
-                const suc = document.getElementById('bookSuccess');
-                if (suc) {
-                    suc.innerHTML = `<h3 style="color:#c9a35a; text-align:center; margin-top:20px;">הבקשה נשלחה בהצלחה!</h3><p style="text-align:center;">ניצור איתך קשר בהקדם.</p>`;
-                    suc.classList.add('show');
-                }
+  forms.forEach(id => {
+    const form = document.getElementById(id);
+    if (!form) return;
 
-                // איפוס הטופס אחרי 6 שניות
-                setTimeout(() => {
-                    form.style.display = '';
-                    form.reset();
-                    if (suc) suc.classList.remove('show');
-                }, 6000);
-            });
-        }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const fd = new FormData(form);
+
+      const booking = {
+        createdAt: new Date().toISOString(),
+        status: "חדש",
+        name: fd.get('name') || '',
+        phone: fd.get('phone') || '',
+        checkin: fd.get('checkin') || '',
+        checkout: fd.get('checkout') || '',
+        guests: fd.get('guests') || '',
+        event: fd.get('event') || '',
+        notes: fd.get('notes') || ''
+      };
+
+      await addDoc(collection(db, "bookings"), booking);
+
+      const wa = window.SITE_SETTINGS?.whatsapp || '0505120820';
+
+      const msg =
+`הזמנה חדשה - Cialo Boutique
+שם: ${booking.name}
+טלפון: ${booking.phone}
+כניסה: ${booking.checkin}
+יציאה: ${booking.checkout}
+אורחים: ${booking.guests}
+אירוע: ${booking.event}
+הערות: ${booking.notes}`;
+
+      window.open(
+        `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`,
+        "_blank"
+      );
+
+      form.style.display = "none";
+
+      const ok = document.getElementById('bookSuccess');
+      if (ok) {
+        ok.innerHTML = "✔ נשלח בהצלחה";
+        ok.classList.add("show");
+      }
+
+      setTimeout(() => {
+        form.reset();
+        form.style.display = "";
+        if (ok) ok.classList.remove("show");
+      }, 5000);
     });
+  });
 });
 </script>
 </body>

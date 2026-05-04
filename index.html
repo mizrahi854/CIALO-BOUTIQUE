@@ -408,20 +408,45 @@
 
 <script src="app.js"></script>
 
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
+  authDomain: "cialo-boutique.firebaseapp.com",
+  projectId: "cialo-boutique",
+  storageBucket: "cialo-boutique.firebasestorage.app",
+  messagingSenderId: "3716819450",
+  appId: "1:3716819450:web:69e9d4b528b23893efdc43"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 🔥 זה מה שהופך את זה לעובד אצלך בקוד הראשי
+window.db = db;
+window.firebaseAPI = {
+  collection,
+  addDoc
+};
+</script>
+
 <!-- סקריפט התרגום - חיבור הטפסים ל-CMS -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const langBtn = document.getElementById('langBtn');
-    
+
     const formHe = document.getElementById('bookForm-he');
     const formEn = document.getElementById('bookForm-en');
 
-    let currentLang = 'he'; 
+    let currentLang = 'he';
 
     if (langBtn) {
         langBtn.addEventListener('click', () => {
             currentLang = currentLang === 'he' ? 'en' : 'he';
-            
+
             document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
             document.documentElement.lang = currentLang;
 
@@ -430,84 +455,77 @@ document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll('.lang-he').forEach(el => {
                 el.style.display = currentLang === 'he' ? '' : 'none';
             });
+
             document.querySelectorAll('.lang-en').forEach(el => {
                 el.style.display = currentLang === 'en' ? '' : 'none';
             });
 
-            // ניהול הטפסים הכפול
-            if(currentLang === 'he') {
-                if(formHe) Array.from(formHe.elements).forEach(e => e.disabled = false);
-                if(formEn) Array.from(formEn.elements).forEach(e => e.disabled = true);
+            if (currentLang === 'he') {
+                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = false);
+                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = true);
             } else {
-                if(formHe) Array.from(formHe.elements).forEach(e => e.disabled = true);
-                if(formEn) Array.from(formEn.elements).forEach(e => e.disabled = false);
+                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = true);
+                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = false);
             }
-
-            setTimeout(() => {
-                if (typeof ScrollTrigger !== 'undefined') {
-                    ScrollTrigger.refresh();
-                }
-            }, 100);
         });
     }
 
-    // --- חיבור הטפסים הכפולים למערכת הניהול (CMS) ---
+    // ✅ שליחת טפסים ל-Firebase
     ['bookForm-he', 'bookForm-en'].forEach(formId => {
         const form = document.getElementById(formId);
-        if(form) {
-            form.addEventListener('submit', e => {
+
+        if (form) {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
+
                 const fd = new FormData(e.target);
+
                 const booking = {
                     id: Date.now().toString(),
                     createdAt: new Date().toISOString(),
-                    status: 'חדש',
+                    status: "חדש",
                     name: fd.get('name') || '',
                     phone: fd.get('phone') || '',
                     checkin: fd.get('checkin') || '',
                     checkout: fd.get('checkout') || '',
                     guests: fd.get('guests') || '',
                     event: fd.get('event') || '',
-                    notes: fd.get('notes') || '',
+                    notes: fd.get('notes') || ''
                 };
 
-                // שמירה ב-Local Storage כדי שיופיע בלוח הבקרה (Admin)
                 try {
-                    const arr = JSON.parse(localStorage.getItem('cialo:bookings:v1') || '[]');
-                    arr.unshift(booking);
-                    localStorage.setItem('cialo:bookings:v1', JSON.stringify(arr));
-                } catch(err) {}
+                    await window.firebaseAPI.addDoc(
+                        window.firebaseAPI.collection(window.db, "bookings"),
+                        booking
+                    );
+                } catch (err) {
+                    console.error("Firebase error:", err);
+                }
 
-                // משיכת הגדרות הווצאפ מהניהול
+                // WhatsApp
                 let S = { whatsapp: '972501234567' };
-                try { 
-                    const storedSettings = JSON.parse(localStorage.getItem('cialo:settings:v2'));
-                    if (storedSettings && storedSettings.whatsapp) {
-                        S.whatsapp = storedSettings.whatsapp;
-                    }
-                } catch(e) {}
+                try {
+                    const stored = JSON.parse(localStorage.getItem('cialo:settings:v2'));
+                    if (stored?.whatsapp) S.whatsapp = stored.whatsapp;
+                } catch {}
 
-                // יצירת הודעת הווצאפ
-                const msg = `*הזמנה חדשה - Villa Cialo Boutique*\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin || '-'}\nיציאה: ${booking.checkout || '-'}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes || '-'}`;
-                
-                // פתיחת ווצאפ
-                window.open(`https://wa.me/${S.whatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+                const msg = `הזמנה חדשה - Villa Cialo Boutique\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin}\nיציאה: ${booking.checkout}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes}`;
 
-                // הצגת הודעת הצלחה
+                window.open(`https://wa.me/${S.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank");
+
                 form.style.display = 'none';
                 const suc = document.getElementById('bookSuccess');
-                if(suc) suc.classList.add('show');
-                
+                if (suc) suc.classList.add('show');
+
                 setTimeout(() => {
-                    form.style.display = ''; 
+                    form.style.display = '';
                     form.reset();
-                    if(suc) suc.classList.remove('show');
-                }, 7000);
+                    if (suc) suc.classList.remove('show');
+                }, 6000);
             });
         }
     });
 });
 </script>
-
 </body>
 </html>

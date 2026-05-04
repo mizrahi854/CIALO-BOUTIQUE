@@ -875,5 +875,34 @@ function init(){
 
 show();
 </script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  getDocs 
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
+  authDomain: "cialo-boutique.firebaseapp.com",
+  projectId: "cialo-boutique",
+  storageBucket: "cialo-boutique.firebasestorage.app",
+  messagingSenderId: "3716819450",
+  appId: "1:3716819450:web:69e9d4b528b23893efdc43"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.db = db;
+window.firebaseAPI = { doc, setDoc, collection, addDoc, onSnapshot, getDocs };
+</script>
+<input id="title" placeholder="כותרת אתר">
+<button onclick="saveSite()">שמור</button>
 </body>
 </html>

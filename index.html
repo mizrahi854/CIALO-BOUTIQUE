@@ -92,8 +92,8 @@
     <span class="eyebrow reveal">VILLA CIALO BOUTIQUE</span>
     <h1 class="display reveal" data-delay="100">
       <!-- הוסף id="heroLine1" ו-id="heroLine2" רק על הספאן בעברית -->
-      <span><span class="lang-he" id="heroLine1">חוויית בוטיק</span><span class="lang-en" style="display:none;">Boutique Experience</span></span>
-      <span class="italic"><span class="lang-he" id="heroLine2">פרטית מול הכנרת</span><span class="lang-en" style="display:none;">Private by the Kinneret</span></span>
+      <span><span class="lang-he" id="heroLine1">חוויית בוטיק</span><span class="lang-en" style="display:none;">  CIALO </span></span>
+      <span class="italic"><span class="lang-he" id="heroLine2">פרטית מול הכנרת</span><span class="lang-en" style="display:none;"> BOUTIQUE </span></span>
     </h1>
     <p class="hero-sub reveal" data-delay="250">
       <!-- הוסף id="heroSub" רק על הספאן בעברית -->
@@ -551,60 +551,88 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // שליחת טפסים ישירות ל-Firebase (בלי LocalStorage)
-    ['bookForm-he', 'bookForm-en'].forEach(formId => {
-        const form = document.getElementById(formId);
+// שליחת טפסים ישירות ל-Firebase ושליחה לוואטסאפ
+['bookForm-he', 'bookForm-en'].forEach(formId => {
+    const form = document.getElementById(formId);
+    if (!form) return;
 
-        if (form) {
     form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-                const fd = new FormData(e.target);
+        e.preventDefault();
+        
+        // מניעת לחיצות כפולות
+        const btn = form.querySelector('button[type="submit"]');
+        if(btn) btn.disabled = true;
 
-      const booking = {
-        createdAt: new Date().toISOString(),
-        status: "חדש",
-        name: fd.get('name') || '',
-        phone: fd.get('phone') || '',
-        checkin: fd.get('checkin') || '',
-        checkout: fd.get('checkout') || '',
-        guests: fd.get('guests') || '',
-        event: fd.get('event') || '',
-        notes: fd.get('notes') || ''
-      };
+        // 1. איסוף הנתונים מהטופס - הדרך הכי בטוחה
+        const fd = new FormData(form);
+        
+        // יצירת אובייקט עם הנתונים (השמות בתוך ה-get חייבים להיות זהים ל-name ב-HTML)
+        const booking = {
+            createdAt: new Date().toISOString(),
+            status: "חדש",
+            name: fd.get('name') || '',
+            phone: fd.get('phone') || '',
+            checkin: fd.get('checkin') || '',
+            checkout: fd.get('checkout') || '',
+            guests: fd.get('guests') || '',
+            event: fd.get('event') || '',
+            notes: fd.get('notes') || ''
+        };
 
-                try {
-                    // שמירת ההזמנה במסד הנתונים
-                    await window.firebaseAPI.addDoc(
-                        window.firebaseAPI.collection(window.db, "bookings"),
-                        booking
-                    );
-                } catch (err) {
-                    console.error("שגיאה בשמירת נתונים ל-Firebase:", err);
-                }
-
-                // שליחה לוואטסאפ מבוסס על ההגדרות החיות שנמשכו מ-Firebase
-                const waNumber = window.SITE_SETTINGS?.whatsapp || '0505120820';
-                const msg = `הזמנה חדשה - Cialo Boutique\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin}\nיציאה: ${booking.checkout}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes}`;
-
-                window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, "_blank");
-
-                // הצגת הודעת הצלחה
-                form.style.display = 'none';
-                const suc = document.getElementById('bookSuccess');
-                if (suc) {
-                    suc.innerHTML = `<h3 style="color:#c9a35a; text-align:center; margin-top:20px;">הבקשה נשלחה בהצלחה!</h3><p style="text-align:center;">ניצור איתך קשר בהקדם.</p>`;
-                    suc.classList.add('show');
-      }
-
-                // איפוס הטופס אחרי 6 שניות
-      setTimeout(() => {
-                    form.style.display = '';
-        form.reset();
-                    if (suc) suc.classList.remove('show');
-                }, 6000);
-    });
+        // 2. שמירה ל-Firebase
+        try {
+            if (window.firebaseAPI && window.db) {
+                const { addDoc, collection } = window.firebaseAPI;
+                await addDoc(collection(window.db, "bookings"), booking);
+            }
+        } catch (err) {
+            console.error("Firebase Error:", err);
         }
-  });
+
+        // 3. הכנת מספר הוואטסאפ מהניהול
+        const appSettings = window.SETTINGS || window.SITE_SETTINGS || {};
+        let waNumber = appSettings.whatsapp || '972505120820';
+        
+        // ניקוי המספר מתווים לא רצויים
+        waNumber = waNumber.replace(/\D/g, ''); 
+        if (waNumber.startsWith('0')) waNumber = '972' + waNumber.substring(1);
+
+        // 4. בניית ההודעה עם הפרטים שהלקוח מילא
+        const msg = `*הזמנה חדשה - Cialo Boutique*
+--------------------------
+👤 *שם:* ${booking.name}
+📞 *טלפון:* ${booking.phone}
+📅 *תאריך כניסה:* ${booking.checkin}
+📅 *תאריך יציאה:* ${booking.checkout}
+👥 *מספר אורחים:* ${booking.guests}
+🎉 *סוג אירוע:* ${booking.event}
+📝 *הערות:* ${booking.notes}
+--------------------------`;
+
+        // 5. חיווי ויזואלי למשתמש
+        const suc = document.getElementById('bookSuccess');
+        if (suc) {
+            suc.innerHTML = `<div style="text-align:center; padding:20px; border:1px solid #c9a35a;">
+                <h3 style="color:#c9a35a;">הבקשה נשלחה!</h3>
+                <p>מעביר אותך לוואטסאפ לתיאום סופי...</p>
+            </div>`;
+            suc.classList.add('show');
+            form.style.opacity = '0.3';
+        }
+
+        // 6. העברה לוואטסאפ ואיפוס הטופס
+        setTimeout(() => {
+            window.location.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
+        }, 1200);
+
+        setTimeout(() => {
+            if(btn) btn.disabled = false;
+            form.style.opacity = '1';
+            form.reset();
+            if (suc) suc.classList.remove('show');
+        }, 6000);
+    });
+});
 });
 </script>
 </body>

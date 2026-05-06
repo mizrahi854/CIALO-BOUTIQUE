@@ -411,13 +411,8 @@
 <!-- ══ Firebase — מקור אמת יחיד לגלריה, הגדרות, הזמנות ══ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import {
-  getFirestore,
-  collection, doc,
-  onSnapshot, addDoc
-} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
-/* ── Init ── */
 const firebaseConfig = {
   apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
   authDomain: "cialo-boutique.firebaseapp.com",
@@ -426,68 +421,73 @@ const firebaseConfig = {
   messagingSenderId: "3716819450",
   appId: "1:3716819450:web:69e9d4b528b23893efdc43"
 };
+
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
-/* shared state */
-window.SITE_SETTINGS = { whatsapp: '9720505120820' };
+// חשיפה גלובלית לטופס ההזמנה
+window.db = db;
+window.firebaseAPI = { collection, addDoc };
+window.SITE_SETTINGS = { whatsapp: '0505120820' };
 
-/* ─────────── GALLERY SYNC ─────────── */
-let allGalleryItems = [];
-let currentCat      = 'הכל';
-
-const CAT_ORDER = ['בריכה', "ג'קוזי", 'חדרים', 'נוף', 'כללי'];
-
-onSnapshot(collection(db, 'gallery'), snap => {
-  allGalleryItems = snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) =>
-      CAT_ORDER.indexOf(a.cat || 'כללי') - CAT_ORDER.indexOf(b.cat || 'כללי')
-    );
-  renderGallery(currentCat);
-});
-
-function imgSrc(item) {
-  const f = item.file || item.url || '';
+// ── helpers ──────────────────────────────────────────────
+function imgSrc(img) {
+  const f = img.file || img.url || '';
   if (!f) return '';
-  if (f.startsWith('http') || f.startsWith('data:')) return f;
+  if (f.startsWith('data:') || f.startsWith('http')) return f;
   return 'images/' + f;
 }
 
-function renderGallery(cat) {
-  currentCat = cat;
+const LAYOUT = ['wide tall','','','tall','','wide','','','tall','','','','wide','','',''];
+
+// ── 1. גלריה — Firebase → DOM (תואם CSS של .gi + lightbox) ──
+let currentCat = 'הכל';
+
+onSnapshot(collection(db, "gallery"), (snap) => {
+  const CAT_ORDER = ['בריכה',"ג'קוזי",'חדרים','נוף','כללי'];
+  const gallery = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => CAT_ORDER.indexOf(a.cat||'כללי') - CAT_ORDER.indexOf(b.cat||'כללי'));
+
   const grid = document.getElementById('galleryGrid');
   if (!grid) return;
 
-  const filtered = cat === 'הכל'
-    ? allGalleryItems
-    : allGalleryItems.filter(g => g.cat === cat);
-
-  const layout = ['wide tall','','','tall','','wide','','','tall','','','','wide','','',''];
   grid.innerHTML = '';
+  const srcs = gallery.map(img => imgSrc(img)); // מערך לlightbox
 
-  filtered.forEach((img, i) => {
-    const src = imgSrc(img);
+  gallery.forEach((img, i) => {
+    const src = srcs[i];
     const div = document.createElement('div');
-    div.className = 'gi reveal in ' + (layout[i % layout.length] || '');
+    // class "gi" + layout class + data-cat לסינון
+    div.className = 'gi reveal in ' + (LAYOUT[i % LAYOUT.length] || '');
+    div.dataset.cat    = img.cat || 'כללי';
     div.dataset.cursor = 'hover';
     div.innerHTML = `<img src="${src}" alt="${img.title || ''}" loading="lazy" />`;
     div.addEventListener('click', () => {
-      const allSrcs = filtered.map(x => ({ src: imgSrc(x) }));
-      window.openLightbox && window.openLightbox(src, allSrcs, i);
+      window.setLightboxItems && window.setLightboxItems(srcs);
+      window.openLightbox && window.openLightbox(i);
     });
     grid.appendChild(div);
   });
 
-  /* category filter buttons */
-  document.querySelectorAll('.gcat-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.cat === cat);
-    btn.onclick = () => renderGallery(btn.dataset.cat);
-  });
-}
+  // עדכן lightbox ועדכן סינון נוכחי
+  window.setLightboxItems && window.setLightboxItems(srcs);
 
-/* ─────────── SETTINGS SYNC ─────────── */
-onSnapshot(doc(db, 'settings', 'site'), snap => {
+  // שמור על הסינון הנבחר לאחר רענון מFirebase
+  const cat = currentCat;
+  document.querySelectorAll('#galleryGrid .gi').forEach(item => {
+    item.style.display = (cat === 'הכל' || item.dataset.cat === cat) ? '' : 'none';
+  });
+});
+
+// שמור את הקטגוריה הנבחרת בזמן אמת
+document.getElementById('galleryCats')?.addEventListener('click', e => {
+  const btn = e.target.closest('.gcat-btn');
+  if (btn) currentCat = btn.dataset.cat;
+});
+
+// ── 2. הגדרות ────────────────────────────────────────────
+onSnapshot(doc(db, "settings", "site"), (snap) => {
   if (!snap.exists()) return;
   const s = snap.data();
   window.SITE_SETTINGS = s;
@@ -508,58 +508,102 @@ onSnapshot(doc(db, 'settings', 'site'), snap => {
     const sc = document.getElementById('stickyCall');
     if (sc) sc.href = 'tel:' + s.phone.replace(/[^\d+]/g, '');
   }
-
   if (s.email) {
     const m = document.getElementById('footMail');
     if (m) { m.innerText = s.email; m.href = 'mailto:' + s.email; }
   }
-
   if (s.whatsapp) {
     const waLink = `https://wa.me/${s.whatsapp}?text=${encodeURIComponent(s.whatsappMsg || 'שלום')}`;
-    ['footWa', 'stickyWa', 'floatWa'].forEach(id => {
+    ['footWa','stickyWa','floatWa'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.href = waLink;
     });
   }
 });
+</script>
 
-/* ─────────── BOOKING FORMS ─────────── */
-['bookForm-he', 'bookForm-en'].forEach(formId => {
-  const form = document.getElementById(formId);
-  if (!form) return;
+<!-- סקריפט התרגום ושליחת הטפסים -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const langBtn = document.getElementById('langBtn');
+    const formHe = document.getElementById('bookForm-he');
+    const formEn = document.getElementById('bookForm-en');
+    let currentLang = 'he';
 
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    const fd = new FormData(form);
+    // מנגנון תרגום (נשאר בדיוק כפי שהיה)
+    if (langBtn) {
+        langBtn.addEventListener('click', () => {
+            currentLang = currentLang === 'he' ? 'en' : 'he';
+            document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
+            document.documentElement.lang = currentLang;
+            langBtn.innerText = currentLang === 'he' ? 'EN' : 'עב';
 
-    const booking = {
-      createdAt: new Date().toISOString(),
-      status:    'חדש',
-      name:      fd.get('name')     || '',
-      phone:     fd.get('phone')    || '',
-      checkin:   fd.get('checkin')  || '',
-      checkout:  fd.get('checkout') || '',
-      guests:    fd.get('guests')   || '',
-      event:     fd.get('event')    || '',
-      notes:     fd.get('notes')    || '',
-    };
+            document.querySelectorAll('.lang-he').forEach(el => el.style.display = currentLang === 'he' ? '' : 'none');
+            document.querySelectorAll('.lang-en').forEach(el => el.style.display = currentLang === 'en' ? '' : 'none');
 
-    /* שמור ב-Firestore */
-    await addDoc(collection(db, 'bookings'), booking);
+            if (currentLang === 'he') {
+                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = false);
+                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = true);
+            } else {
+                if (formHe) Array.from(formHe.elements).forEach(e => e.disabled = true);
+                if (formEn) Array.from(formEn.elements).forEach(e => e.disabled = false);
+            }
+        });
+    }
 
-    /* פתח WA */
-    const wa = window.SITE_SETTINGS?.whatsapp || '9720505120820';
-    const msg = `הזמנה חדשה - Cialo Boutique\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin}\nיציאה: ${booking.checkout}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes}`;
-    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`, '_blank');
+    // שליחת טפסים ישירות ל-Firebase (בלי LocalStorage)
+    ['bookForm-he', 'bookForm-en'].forEach(formId => {
+        const form = document.getElementById(formId);
 
-    /* הצג הודעת הצלחה */
-    form.style.display = 'none';
-    const ok = document.getElementById('bookSuccess');
-    if (ok) { ok.innerHTML = '✔ נשלח בהצלחה'; ok.classList.add('show'); }
-    setTimeout(() => {
-      form.reset(); form.style.display = '';
-      if (ok) ok.classList.remove('show');
-    }, 6000);
+        if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+                const fd = new FormData(e.target);
+
+      const booking = {
+        createdAt: new Date().toISOString(),
+        status: "חדש",
+        name: fd.get('name') || '',
+        phone: fd.get('phone') || '',
+        checkin: fd.get('checkin') || '',
+        checkout: fd.get('checkout') || '',
+        guests: fd.get('guests') || '',
+        event: fd.get('event') || '',
+        notes: fd.get('notes') || ''
+      };
+
+                try {
+                    // שמירת ההזמנה במסד הנתונים
+                    await window.firebaseAPI.addDoc(
+                        window.firebaseAPI.collection(window.db, "bookings"),
+                        booking
+                    );
+                } catch (err) {
+                    console.error("שגיאה בשמירת נתונים ל-Firebase:", err);
+                }
+
+                // שליחה לוואטסאפ מבוסס על ההגדרות החיות שנמשכו מ-Firebase
+                const waNumber = window.SITE_SETTINGS?.whatsapp || '0505120820';
+                const msg = `הזמנה חדשה - Cialo Boutique\nשם: ${booking.name}\nטלפון: ${booking.phone}\nכניסה: ${booking.checkin}\nיציאה: ${booking.checkout}\nאורחים: ${booking.guests}\nאירוע: ${booking.event}\nהערות: ${booking.notes}`;
+
+                window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, "_blank");
+
+                // הצגת הודעת הצלחה
+                form.style.display = 'none';
+                const suc = document.getElementById('bookSuccess');
+                if (suc) {
+                    suc.innerHTML = `<h3 style="color:#c9a35a; text-align:center; margin-top:20px;">הבקשה נשלחה בהצלחה!</h3><p style="text-align:center;">ניצור איתך קשר בהקדם.</p>`;
+                    suc.classList.add('show');
+      }
+
+                // איפוס הטופס אחרי 6 שניות
+      setTimeout(() => {
+                    form.style.display = '';
+        form.reset();
+                    if (suc) suc.classList.remove('show');
+                }, 6000);
+    });
+        }
   });
 });
 </script>

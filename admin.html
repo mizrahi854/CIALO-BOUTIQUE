@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ניהול — Villa Cialo Boutique</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #c9a35a;
+    --gold-light: #e0bb7a;
+    --dark: #0f0d0a;
+    --dark2: #1a1713;
+    --dark3: #252118;
+    --text: #e8e0d0;
+    --muted: #8a7d6a;
+    --border: #2e2820;
+    --red: #c0392b;
+    --green: #27ae60;
+  }
+
+  body {
+    font-family: 'Heebo', 'Segoe UI', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* ── Auth overlay ── */
+  #authOverlay {
+    position: fixed; inset: 0;
+    background: var(--dark);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .auth-box {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    width: 340px;
+    text-align: center;
+  }
+  .auth-box h2 { color: var(--gold); margin-bottom: 24px; font-size: 1.3rem; }
+  .auth-box input {
+    width: 100%; padding: 12px 16px;
+    background: var(--dark3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 15px;
+    margin-bottom: 16px; direction: ltr;
+  }
+  .auth-box button {
+    width: 100%; padding: 12px;
+    background: var(--gold); color: var(--dark);
+    border: none; border-radius: 8px;
+    font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+  .auth-error { color: #e74c3c; font-size: 13px; margin-top: 10px; }
+
+  /* ── Layout ── */
+  .admin-layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--dark2);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar-logo {
+    padding: 24px 20px;
+    border-bottom: 1px solid var(--border);
+    color: var(--gold);
+    font-size: 1rem; font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .sidebar-logo span { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  .sidebar-nav { flex: 1; padding: 16px 0; }
+  .sidebar-nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 20px;
+    color: var(--muted); text-decoration: none;
+    font-size: 14px; transition: all .2s;
+    cursor: pointer;
+  }
+  .sidebar-nav a:hover, .sidebar-nav a.active {
+    color: var(--gold); background: rgba(201,163,90,.07);
+  }
+  .sidebar-nav a .ico { font-size: 18px; width: 24px; text-align: center; }
+  .sidebar-bottom { padding: 16px 20px; border-top: 1px solid var(--border); }
+  .sidebar-bottom a {
+    color: var(--muted); text-decoration: none; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sidebar-bottom a:hover { color: var(--gold); }
+
+  /* Main content */
+  .main { flex: 1; overflow-y: auto; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--dark2);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar h1 { font-size: 1.2rem; color: var(--text); font-weight: 500; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    margin-left: 8px; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* Panels */
+  .panel { display: none; padding: 32px; }
+  .panel.active { display: block; }
+
+  .panel-title {
+    font-size: 1.4rem; color: var(--gold);
+    margin-bottom: 28px; padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* Form elements */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 13px; color: var(--muted); }
+  input[type="text"], input[type="tel"], input[type="email"], input[type="url"], textarea, select {
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    width: 100%;
+    font-family: inherit;
+    transition: border-color .2s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--gold);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* Buttons */
+  .btn {
+    padding: 10px 22px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    border: none; transition: all .2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-gold { background: var(--gold); color: var(--dark); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { opacity: .85; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--dark2); border: 1px solid var(--gold);
+    color: var(--gold); padding: 12px 20px; border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    transform: translateY(80px); opacity: 0;
+    transition: all .3s; z-index: 9990;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--dark2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 2rem; font-weight: 700; color: var(--gold); }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Bookings table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 12px 14px; text-align: right; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  td { border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+  }
+  .badge-new { background: rgba(201,163,90,.15); color: var(--gold); }
+  .badge-confirmed { background: rgba(39,174,96,.15); color: var(--green); }
+  .badge-cancelled { background: rgba(192,57,43,.15); color: var(--red); }
+
+  /* Gallery admin */
+  .gallery-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .gallery-admin-item {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    position: relative;
+  }
+  .gallery-admin-item img {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  }
+  .gallery-admin-item .item-info {
+    padding: 8px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .gallery-admin-item .item-title { font-size: 12px; color: var(--muted); flex: 1; }
+  .gallery-admin-item .item-del {
+    background: none; border: none;
+    color: var(--red); cursor: pointer; font-size: 16px;
+    padding: 2px 6px; border-radius: 4px;
+    opacity: .6; transition: opacity .2s;
+  }
+  .gallery-admin-item .item-del:hover { opacity: 1; }
+  .gallery-admin-item .cat-badge {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,.65); color: var(--gold);
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+  }
+
+  /* Upload area */
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 12px; padding: 32px;
+    text-align: center; cursor: pointer;
+    transition: border-color .2s;
+    margin-bottom: 16px;
+  }
+  .upload-area:hover { border-color: var(--gold); }
+  .upload-area .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .upload-area p { color: var(--muted); font-size: 14px; }
+  .upload-area input { display: none; }
+
+  /* Image preview row */
+  .preview-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .preview-thumb {
+    width: 80px; height: 60px; object-fit: cover;
+    border-radius: 6px; border: 1px solid var(--border);
+  }
+
+  /* Settings section blocks */
+  .settings-block {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .settings-block h3 { color: var(--gold); font-size: 14px; margin-bottom: 18px; font-weight: 600; }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .admin-layout { flex-direction: column; }
+    .sidebar {
+      width: 100%; height: auto; position: relative;
+      flex-direction: row; flex-wrap: wrap;
+    }
+    .sidebar-logo { width: 100%; }
+    .sidebar-nav { display: flex; flex-direction: row; overflow-x: auto; padding: 8px; width: 100%; }
+    .sidebar-nav a { padding: 10px 14px; white-space: nowrap; }
+    .sidebar-bottom { display: none; }
+    .panel { padding: 20px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .topbar { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Auth Overlay -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <h2>🔐 כניסה לניהול</h2>
+    <input type="password" id="pwdInput" placeholder="סיסמא" />
+    <button onclick="checkAuth()">כניסה</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<div class="admin-layout" id="adminLayout" style="display:none;">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      CIALO
+      <span>לוח ניהול</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="active" data-tab="dashboard" onclick="switchTab('dashboard',this)">
+        <span class="ico">📊</span> סקירה
+      </a>
+      <a data-tab="bookings" onclick="switchTab('bookings',this)">
+        <span class="ico">📅</span> הזמנות
+      </a>
+      <a data-tab="gallery" onclick="switchTab('gallery',this)">
+        <span class="ico">🖼</span> גלריה
+      </a>
+      <a data-tab="settings" onclick="switchTab('settings',this)">
+        <span class="ico">⚙️</span> הגדרות
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="index.html" target="_blank">🔗 צפייה באתר</a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <h1 id="topbarTitle">סקירה כללית</h1>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);">
+        <span class="status-dot"></span> מחובר ל-Firebase
+        <button class="btn btn-ghost btn-sm" onclick="logout()">יציאה</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="panel active" id="tab-dashboard">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="num" id="statTotal">—</div>
+          <div class="lbl">סה"כ הזמנות</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="statNew">—</div>
+          <div class="lbl">הזמנות חדשות</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="statConfirmed">—</div>
+          <div class="lbl">מאושרות</div>
+        </div>
+        <div class="stat-card">
+          <div class="num" id="statGallery">—</div>
+          <div class="lbl">תמונות בגלריה</div>
+        </div>
+      </div>
+      <div class="panel-title">הזמנות אחרונות</div>
+      <div class="table-wrap">
+        <table id="dashTable">
+          <thead><tr>
+            <th>שם</th><th>טלפון</th><th>כניסה</th><th>יציאה</th><th>סטטוס</th>
+          </tr></thead>
+          <tbody id="dashTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BOOKINGS -->
+    <div class="panel" id="tab-bookings">
+      <div class="panel-title">
+        <span>ניהול הזמנות</span>
+      </div>
+      <div class="table-wrap">
+        <table id="bookingsTable">
+          <thead><tr>
+            <th>תאריך</th><th>שם</th><th>טלפון</th><th>כניסה</th><th>יציאה</th><th>אורחים</th><th>אירוע</th><th>סטטוס</th><th>פעולות</th>
+          </tr></thead>
+          <tbody id="bookingsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GALLERY -->
+    <div class="panel" id="tab-gallery">
+      <div class="panel-title">
+        <span>ניהול גלריה</span>
+        <button class="btn btn-gold btn-sm" onclick="document.getElementById('galleryFileInput').click()">+ הוסף תמונות</button>
+      </div>
+
+      <!-- Upload -->
+      <div class="upload-area" onclick="document.getElementById('galleryFileInput').click()">
+        <div class="icon">📸</div>
+        <p>לחץ להעלאת תמונות (JPEG/PNG/WebP)</p>
+        <input type="file" id="galleryFileInput" accept="image/*" multiple onchange="handleGalleryUpload(event)" />
+      </div>
+
+      <!-- Form for new images -->
+      <div id="pendingUploads" style="display:none;background:var(--dark2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">
+        <h3 style="color:var(--gold);font-size:14px;margin-bottom:14px;">תמונות בהמתנה</h3>
+        <div class="preview-row" id="previewRow"></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>כותרת (לכולן)</label>
+            <input type="text" id="newImgTitle" placeholder="למשל: בריכה בשקיעה" />
+          </div>
+          <div class="form-group">
+            <label>קטגוריה</label>
+            <select id="newImgCat">
+              <option value="בריכה">🏊 בריכה</option>
+              <option value="ג'קוזי">♨ ג'קוזי</option>
+              <option value="חדרים">🛏 חדרים</option>
+              <option value="נוף">🌅 נוף</option>
+              <option value="כללי">🏡 כללי</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-gold" onclick="savePendingImages()">שמור לגלריה</button>
+          <button class="btn btn-ghost" onclick="cancelPending()">ביטול</button>
+        </div>
+      </div>
+
+      <!-- Existing gallery -->
+      <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;" id="galFilterBtns">
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('הכל',this)" style="border-color:var(--gold);color:var(--gold);">הכל</button>
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('בריכה',this)">בריכה</button>
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('ג\'קוזי',this)">ג'קוזי</button>
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('חדרים',this)">חדרים</button>
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('נוף',this)">נוף</button>
+        <button class="btn btn-ghost btn-sm" onclick="filterGalleryAdmin('כללי',this)">כללי</button>
+      </div>
+      <div class="gallery-admin-grid" id="galleryAdminGrid"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="panel" id="tab-settings">
+      <div class="panel-title">הגדרות האתר</div>
+
+      <div class="settings-block">
+        <h3>📞 פרטי יצירת קשר</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>טלפון</label>
+            <input type="tel" id="sPhone" placeholder="050-5120820" />
+          </div>
+          <div class="form-group">
+            <label>וואטסאפ (מספר בינלאומי)</label>
+            <input type="tel" id="sWhatsapp" placeholder="9720505120820" />
+          </div>
+          <div class="form-group full">
+            <label>כתובת מייל</label>
+            <input type="email" id="sEmail" placeholder="info@villacialoboutique.com" />
+          </div>
+          <div class="form-group full">
+            <label>הודעת ברירת מחדל לוואטסאפ</label>
+            <textarea id="sWaMsg" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-block">
+        <h3>🏠 טקסט Hero (כותרות ראשיות)</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>שורה 1</label>
+            <input type="text" id="sHeroL1" />
+          </div>
+          <div class="form-group">
+            <label>שורה 2</label>
+            <input type="text" id="sHeroL2" />
+          </div>
+          <div class="form-group full">
+            <label>תת-כותרת</label>
+            <textarea id="sHeroSub" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-block">
+        <h3>🖼 תמונות ראשיות</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>תמונת Hero (URL)</label>
+            <input type="url" id="sHeroImg" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>תמונת About 1 (URL)</label>
+            <input type="url" id="sAboutImg1" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>תמונת About 2 (URL)</label>
+            <input type="url" id="sAboutImg2" placeholder="https://..." />
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-gold" onclick="saveSettings()">💾 שמור הגדרות</button>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import {
+  getFirestore,
+  collection, doc,
+  onSnapshot, addDoc, setDoc, updateDoc, deleteDoc,
+  query, orderBy, limit
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/12.12.1/firebase-storage.js";
+
+/* ── Firebase init ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyByD1CtNVF8mwXMHyk-96TJmPk9RgLirIA",
+  authDomain: "cialo-boutique.firebaseapp.com",
+  projectId: "cialo-boutique",
+  storageBucket: "cialo-boutique.firebasestorage.app",
+  messagingSenderId: "3716819450",
+  appId: "1:3716819450:web:69e9d4b528b23893efdc43"
+};
+const app     = initializeApp(firebaseConfig);
+const db      = getFirestore(app);
+const storage = getStorage(app);
+
+/* ── Auth (simple password) ── */
+const ADMIN_PASS = '1234'; // שנה לסיסמא שלך
+
+window.checkAuth = function() {
+  const pw = document.getElementById('pwdInput').value;
+  if (pw === ADMIN_PASS) {
+    sessionStorage.setItem('adminAuth', '1');
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('adminLayout').style.display = 'flex';
+    initAdmin();
+  } else {
+    document.getElementById('authError').textContent = 'סיסמא שגויה';
+  }
+};
+document.getElementById('pwdInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.checkAuth();
+});
+if (sessionStorage.getItem('adminAuth') === '1') {
+  document.getElementById('authOverlay').style.display = 'none';
+  document.getElementById('adminLayout').style.display = 'flex';
+  initAdmin();
+}
+
+window.logout = function() {
+  sessionStorage.removeItem('adminAuth');
+  location.reload();
+};
+
+/* ── Tab switching ── */
+window.switchTab = function(tab, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+  const titles = { dashboard:'סקירה כללית', bookings:'הזמנות', gallery:'גלריה', settings:'הגדרות' };
+  document.getElementById('topbarTitle').textContent = titles[tab];
+};
+
+/* ── Toast ── */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── State ── */
+let allBookings = [];
+let allGallery  = [];
+let pendingFiles = [];
+let galleryFilter = 'הכל';
+
+/* ── Init ── */
+function initAdmin() {
+  listenBookings();
+  listenGallery();
+  listenSettings();
+}
+
+/* ════════════════════════════════════
+   BOOKINGS
+════════════════════════════════════ */
+function listenBookings() {
+  onSnapshot(
+    query(collection(db, 'bookings'), orderBy('createdAt', 'desc')),
+    snap => {
+      allBookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderBookings();
+      renderDashboard();
+    }
+  );
+}
+
+function renderBookings() {
+  const tbody = document.getElementById('bookingsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = allBookings.map(b => `
+    <tr>
+      <td>${formatDate(b.createdAt)}</td>
+      <td>${b.name}</td>
+      <td><a href="tel:${b.phone}" style="color:var(--gold)">${b.phone}</a></td>
+      <td>${b.checkin || '—'}</td>
+      <td>${b.checkout || '—'}</td>
+      <td>${b.guests || '—'}</td>
+      <td>${b.event || '—'}</td>
+      <td>${statusBadge(b.status)}</td>
+      <td>
+        <select style="background:var(--dark3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;" onchange="updateStatus('${b.id}', this.value)">
+          <option ${b.status==='חדש'?'selected':''}>חדש</option>
+          <option ${b.status==='מאושר'?'selected':''}>מאושר</option>
+          <option ${b.status==='בוטל'?'selected':''}>בוטל</option>
+        </select>
+        <button class="btn btn-danger btn-sm" style="margin-right:6px;" onclick="deleteBooking('${b.id}')">✕</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderDashboard() {
+  document.getElementById('statTotal').textContent     = allBookings.length;
+  document.getElementById('statNew').textContent       = allBookings.filter(b => b.status === 'חדש').length;
+  document.getElementById('statConfirmed').textContent = allBookings.filter(b => b.status === 'מאושר').length;
+
+  const tbody = document.getElementById('dashTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = allBookings.slice(0, 5).map(b => `
+    <tr>
+      <td>${b.name}</td>
+      <td>${b.phone}</td>
+      <td>${b.checkin || '—'}</td>
+      <td>${b.checkout || '—'}</td>
+      <td>${statusBadge(b.status)}</td>
+    </tr>
+  `).join('');
+}
+
+window.updateStatus = async function(id, status) {
+  await updateDoc(doc(db, 'bookings', id), { status });
+  toast('סטטוס עודכן ✓');
+};
+
+window.deleteBooking = async function(id) {
+  if (!confirm('למחוק הזמנה זו?')) return;
+  await deleteDoc(doc(db, 'bookings', id));
+  toast('הזמנה נמחקה');
+};
+
+/* ════════════════════════════════════
+   GALLERY
+════════════════════════════════════ */
+function listenGallery() {
+  onSnapshot(collection(db, 'gallery'), snap => {
+    allGallery = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGalleryAdmin();
+    document.getElementById('statGallery').textContent = allGallery.length;
+  });
+}
+
+function renderGalleryAdmin() {
+  const grid = document.getElementById('galleryAdminGrid');
+  if (!grid) return;
+  const filtered = galleryFilter === 'הכל'
+    ? allGallery
+    : allGallery.filter(g => g.cat === galleryFilter);
+
+  grid.innerHTML = filtered.map(img => {
+    const src = img.file
+      ? (img.file.startsWith('http') || img.file.startsWith('data:')
+          ? img.file
+          : 'images/' + img.file)
+      : (img.url || '');
+    return `
+      <div class="gallery-admin-item">
+        <img src="${src}" alt="${img.title||''}" loading="lazy" />
+        <span class="cat-badge">${img.cat||'כללי'}</span>
+        <div class="item-info">
+          <span class="item-title">${img.title||'ללא שם'}</span>
+          <button class="item-del" onclick="deleteGalleryItem('${img.id}')">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.filterGalleryAdmin = function(cat, el) {
+  galleryFilter = cat;
+  document.querySelectorAll('#galFilterBtns .btn').forEach(b => {
+    b.style.borderColor = ''; b.style.color = '';
+  });
+  el.style.borderColor = 'var(--gold)'; el.style.color = 'var(--gold)';
+  renderGalleryAdmin();
+};
+
+window.deleteGalleryItem = async function(id) {
+  if (!confirm('למחוק תמונה זו מהגלריה?')) return;
+  await deleteDoc(doc(db, 'gallery', id));
+  toast('תמונה נמחקה');
+};
+
+/* Upload */
+window.handleGalleryUpload = function(e) {
+  pendingFiles = Array.from(e.target.files);
+  if (!pendingFiles.length) return;
+
+  const previewRow = document.getElementById('previewRow');
+  previewRow.innerHTML = '';
+  pendingFiles.forEach(f => {
+    const url = URL.createObjectURL(f);
+    const img = document.createElement('img');
+    img.src = url; img.className = 'preview-thumb';
+    previewRow.appendChild(img);
+  });
+  document.getElementById('pendingUploads').style.display = 'block';
+};
+
+window.cancelPending = function() {
+  pendingFiles = [];
+  document.getElementById('pendingUploads').style.display = 'none';
+  document.getElementById('galleryFileInput').value = '';
+};
+
+window.savePendingImages = async function() {
+  if (!pendingFiles.length) return;
+  const title = document.getElementById('newImgTitle').value.trim() || 'תמונה';
+  const cat   = document.getElementById('newImgCat').value;
+
+  const btn = document.querySelector('#pendingUploads .btn-gold');
+  btn.textContent = 'מעלה...'; btn.disabled = true;
+
+  try {
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const file = pendingFiles[i];
+      // העלאה ל-Firebase Storage
+      const storageRef = ref(storage, `gallery/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // שמירה ב-Firestore
+      await addDoc(collection(db, 'gallery'), {
+        file: downloadURL,
+        title: pendingFiles.length > 1 ? `${title} ${i+1}` : title,
+        cat,
+        createdAt: new Date().toISOString()
+      });
+    }
+    toast(`${pendingFiles.length} תמונות נוספו לגלריה ✓`);
+    cancelPending();
+  } catch (err) {
+    console.error(err);
+    // fallback: שמור כ-base64 אם Storage לא זמין
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const file = pendingFiles[i];
+      const b64 = await fileToBase64(file);
+      await addDoc(collection(db, 'gallery'), {
+        file: b64,
+        title: pendingFiles.length > 1 ? `${title} ${i+1}` : title,
+        cat,
+        createdAt: new Date().toISOString()
+      });
+    }
+    toast(`${pendingFiles.length} תמונות נוספו ✓`);
+    cancelPending();
+  }
+
+  btn.textContent = 'שמור לגלריה'; btn.disabled = false;
+};
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ════════════════════════════════════
+   SETTINGS
+════════════════════════════════════ */
+function listenSettings() {
+  onSnapshot(doc(db, 'settings', 'site'), snap => {
+    if (!snap.exists()) return;
+    const s = snap.data();
+    document.getElementById('sPhone').value    = s.phone    || '';
+    document.getElementById('sWhatsapp').value = s.whatsapp || '';
+    document.getElementById('sEmail').value    = s.email    || '';
+    document.getElementById('sWaMsg').value    = s.whatsappMsg || '';
+    document.getElementById('sHeroL1').value   = s.hero?.titleLine1 || '';
+    document.getElementById('sHeroL2').value   = s.hero?.titleLine2 || '';
+    document.getElementById('sHeroSub').value  = s.hero?.sub || '';
+    document.getElementById('sHeroImg').value  = s.heroImage  || '';
+    document.getElementById('sAboutImg1').value= s.aboutImg1 || '';
+    document.getElementById('sAboutImg2').value= s.aboutImg2 || '';
+  });
+}
+
+window.saveSettings = async function() {
+  const data = {
+    phone:        document.getElementById('sPhone').value.trim(),
+    whatsapp:     document.getElementById('sWhatsapp').value.trim(),
+    email:        document.getElementById('sEmail').value.trim(),
+    whatsappMsg:  document.getElementById('sWaMsg').value.trim(),
+    hero: {
+      titleLine1: document.getElementById('sHeroL1').value.trim(),
+      titleLine2: document.getElementById('sHeroL2').value.trim(),
+      sub:        document.getElementById('sHeroSub').value.trim(),
+    },
+    heroImage:  document.getElementById('sHeroImg').value.trim(),
+    aboutImg1:  document.getElementById('sAboutImg1').value.trim(),
+    aboutImg2:  document.getElementById('sAboutImg2').value.trim(),
+    updatedAt:  new Date().toISOString(),
+  };
+  await setDoc(doc(db, 'settings', 'site'), data, { merge: true });
+  toast('הגדרות נשמרו ✓ — האתר יתעדכן אוטומטית');
+};
+
+/* ════════════════════════════════════
+   Helpers
+════════════════════════════════════ */
+function formatDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', year:'2-digit' });
+  } catch { return iso; }
+}
+
+function statusBadge(s) {
+  const map = {
+    'חדש':   'badge-new',
+    'מאושר': 'badge-confirmed',
+    'בוטל':  'badge-cancelled',
+  };
+  return `<span class="badge ${map[s]||'badge-new'}">${s||'חדש'}</span>`;
+}
+</script>
+
+</body>
+</html>

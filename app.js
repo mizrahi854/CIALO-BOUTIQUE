@@ -1,6 +1,7 @@
 /* =========================================================
    Villa Cialo Boutique — app.js v3
-   Firebase Firestore כמקור אמת יחיד — ללא localStorage
+   UI בלבד — גלריה, הגדרות והזמנות מנוהלים ע"י Firebase
+   ב-index.html. הקובץ הזה לא נוגע ב-localStorage בכלל.
    ========================================================= */
 
 // ── Loader ──────────────────────────────────────────────
@@ -52,7 +53,9 @@ window.addEventListener('load', () => {
 (function reveal() {
   const els = document.querySelectorAll('.reveal');
   const io = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
   }, { threshold: 0.12 });
   els.forEach(el => io.observe(el));
 })();
@@ -75,54 +78,76 @@ window.addEventListener('load', () => {
   loop();
 })();
 
-// ── Year ─────────────────────────────────────────────────
-const yr = document.getElementById('yr');
-if (yr) yr.textContent = new Date().getFullYear();
+// ── Gallery filter buttons ────────────────────────────────
+// הגלריה עצמה מתרנדרת ע"י Firebase ב-index.html.
+// כאן רק מטפלים בכפתורי הסינון — הם מסננים את ה-.gi שכבר בDOM.
+(function galleryCats() {
+  const cats = document.getElementById('galleryCats');
+  if (!cats) return;
 
-// ── Gallery (מנוהל ע"י Firebase — ראה סקריפט module ב-index.html) ──
-// כל לוגיקת הגלריה עברה לסקריפט Firebase בתחתית index.html
+  cats.addEventListener('click', e => {
+    const btn = e.target.closest('.gcat-btn');
+    if (!btn) return;
+    cats.querySelectorAll('.gcat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.dataset.cat;
+    document.querySelectorAll('#galleryGrid .gi').forEach(item => {
+      const match = cat === 'הכל' || item.dataset.cat === cat;
+      item.style.display = match ? '' : 'none';
+    });
+  });
+})();
 
-// ── Lightbox (standalone — עובד עם galleryGrid שנבנה ע"י Firebase) ──
+// ── Lightbox ─────────────────────────────────────────────
+// עובד על כל תמונה שFirebase מוסיף לגריד — openLightbox נחשף גלובלית.
+let lbItems = [];
+let lbIdx   = 0;
+
+function openLightbox(idx) {
+  lbIdx = idx;
+  const lb  = document.getElementById('lightbox');
+  const img = document.getElementById('lbImg');
+  if (!lb || !img || !lbItems[idx]) return;
+  img.src = lbItems[idx];
+  lb.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+window.openLightbox = openLightbox;
+
+// Firebase יקרא לזה לאחר שבנה את הגריד
+window.setLightboxItems = function(items) {
+  lbItems = items;
+};
+
+function closeLightbox() {
+  const lb = document.getElementById('lightbox');
+  if (lb) lb.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function lbNav(dir) {
+  if (!lbItems.length) return;
+  lbIdx = (lbIdx + dir + lbItems.length) % lbItems.length;
+  openLightbox(lbIdx);
+}
+
 (function lightbox() {
-  const lb      = document.getElementById('lightbox');
-  const lbImg   = document.getElementById('lbImg');
   const lbClose = document.getElementById('lbClose');
   const lbNext  = document.getElementById('lbNext');
   const lbPrev  = document.getElementById('lbPrev');
-
-  // מערך תמונות נוכחי — יתעדכן כשגלריה מתרנדרת
-  let items = [];
-  let idx   = 0;
-
-  function open(i) {
-    idx = i;
-    lbImg.src = items[i]?.src || '';
-    lb.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-  function close() {
-    lb.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-  function nav(dir) {
-    idx = (idx + dir + items.length) % items.length;
-    lbImg.src = items[idx]?.src || '';
-  }
-
-  // חשוף לעולם כדי שגלריה Firebase תוכל להשתמש
-  window.openLightbox = function(src, allItems, clickedIdx) {
-    items = allItems;
-    open(clickedIdx);
-  };
-
-  lbClose?.addEventListener('click', close);
-  lbNext?.addEventListener('click', () => nav(1));
-  lbPrev?.addEventListener('click', () => nav(-1));
-  lb?.addEventListener('click', e => { if (e.target === lb) close(); });
+  const lb      = document.getElementById('lightbox');
+  lbClose?.addEventListener('click', closeLightbox);
+  lbNext?.addEventListener('click', () => lbNav(1));
+  lbPrev?.addEventListener('click', () => lbNav(-1));
+  lb?.addEventListener('click', e => { if (e.target === lb) closeLightbox(); });
   document.addEventListener('keydown', e => {
     if (!lb?.classList.contains('open')) return;
-    if (e.key === 'Escape') close();
-    if (e.key === 'ArrowLeft') nav(1);
-    if (e.key === 'ArrowRight') nav(-1);
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lbNav(1);
+    if (e.key === 'ArrowRight') lbNav(-1);
   });
 })();
+
+// ── Year ─────────────────────────────────────────────────
+const yr = document.getElementById('yr');
+if (yr) yr.textContent = new Date().getFullYear();

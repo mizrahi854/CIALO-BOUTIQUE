@@ -487,6 +487,7 @@ button { font: inherit; background: none; border: 0; color: inherit; cursor: poi
   content: ''; position: absolute; inset: 0;
   background: linear-gradient(transparent 50%, rgba(15,13,10,0.6));
   opacity: 0; transition: opacity var(--base);
+  pointer-events: none; /* הוסף את השורה הזו כדי שהלחיצה תעבור לתמונה */
 }
 .gallery-grid .gi:hover::after { opacity: 1; }
 .gallery-grid .gi.tall { grid-row: span 2; }
@@ -716,3 +717,10 @@ button { font: inherit; background: none; border: 0; color: inherit; cursor: poi
 /* ---------- LTR overrides for English ---------- */
 [dir="ltr"] body { font-family: 'Cormorant Garamond', 'Heebo', serif; }
 [dir="ltr"] .display, [dir="ltr"] .display-md { font-family: 'Cormorant Garamond', serif; font-weight: 300; }
+
+
+@media (max-width: 768px) {
+  .hero-bg img {
+    object-position: center 20%; /* משאיר את הפוקוס על מרכז-עליון של התמונה */
+  }
+}

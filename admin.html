@@ -887,21 +887,29 @@ function loadHeroForm() {
 }
 
 window.saveHero = async function() {
-  const heroData = {
-    heroImage: document.getElementById('heroImgUrl').value,
-    aboutImg1: document.getElementById('about1Url').value,
-    aboutImg2: document.getElementById('about2Url').value,
-    hero: {
-      titleLine1: document.getElementById('heroLine1').value,
-      titleLine2: document.getElementById('heroLine2').value,
-      sub: document.getElementById('heroSub').value,
+    const heroData = {
+        hero: {
+            titleLine1: document.getElementById('heroLine1').value,
+            titleLine2: document.getElementById('heroLine2').value,
+            sub: document.getElementById('heroSub').value
+        },
+        heroImage: document.getElementById('heroImgUrl').value,
+        aboutImg1: document.getElementById('about1Url').value,
+        aboutImg2: document.getElementById('about2Url').value
+    };
+
+    try {
+        const { setDoc } = await import("https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js");
+        await setDoc(settingsRef, heroData, { merge: true });
+        
+        const ok = document.getElementById('heroSaveOk');
+        if(ok) { 
+            ok.classList.add('show'); 
+            setTimeout(() => ok.classList.remove('show'), 4000); 
+        }
+    } catch (err) {
+        console.error("שגיאה בשמירת Hero:", err);
     }
-  };
-  
-  await setDoc(settingsRef, heroData, { merge: true });
-  
-  const ok = document.getElementById('heroSaveOk');
-  if(ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 4000); }
 };
 
 // ── SETTINGS UI & ACTIONS ───────────────────────────────
@@ -916,41 +924,40 @@ function loadSettingsForm() {
 }
 
 window.saveSettings = async function() {
-  // 1. איסוף נתונים בסיסיים
-  const settingsData = {
-    phone: document.getElementById('s-phone').value,
-    whatsapp: document.getElementById('s-whatsapp').value,
-    email: document.getElementById('s-email').value,
-    whatsappMsg: document.getElementById('s-wamsg').value
-  };
+    const oldPass = document.getElementById('s-passold').value;
+    const newPass = document.getElementById('s-passnew').value;
+    
+    const settingsData = {
+        phone: document.getElementById('s-phone').value,
+        whatsapp: document.getElementById('s-whatsapp').value,
+        email: document.getElementById('s-email').value,
+        whatsappMsg: document.getElementById('s-wamsg').value
+    };
 
-  // 2. טיפול בשינוי סיסמה - בדיקה אם הוזנו ערכים
-  const oldPass = document.getElementById('s-passold').value;
-  const newPass = document.getElementById('s-passnew').value;
-
-  if (oldPass && newPass) {
-    if (oldPass === getPass()) {
-      // אם הסיסמה הישנה תקינה, נוסיף את החדשה לאובייקט שיישלח ל-Firebase
-      settingsData.adminPass = newPass; 
-      
-      // איפוס השדות בטופס
-      document.getElementById('s-passold').value = '';
-      document.getElementById('s-passnew').value = '';
-    } else {
-      alert('הסיסמה הנוכחית שגויה - השינויים לא נשמרו');
-      return; // עוצר הכל ולא שומר כלום אם הסיסמה שגויה
+    // בדיקה ועדכון סיסמה לסנכרון בענן
+    if (newPass) {
+        if (oldPass === getPass()) {
+            settingsData.adminPass = newPass; // כאן קורה הקסם - הסיסמה נשלחת לענן
+            document.getElementById('s-passold').value = '';
+            document.getElementById('s-passnew').value = '';
+            alert("הסיסמה עודכנה ותסונכרן לכל המכשירים.");
+        } else {
+            alert("הסיסמה הנוכחית שגויה. שאר השינויים יישמרו, אך הסיסמה לא תוחלף.");
+        }
     }
-  }
 
-  // 3. שמירה ל-Firebase (כולל הסיסמה אם עודכנה בתוך settingsData)
-  await setDoc(settingsRef, settingsData, { merge: true });
-
-  // 4. חיווי ויזואלי על הצלחה
-  const ok = document.getElementById('settingsSaveOk');
-  if(ok) { 
-    ok.classList.add('show'); 
-    setTimeout(() => ok.classList.remove('show'), 3000); 
-  }
+    try {
+        // שמירה ל-Firestore עם merge כדי לא למחוק נתונים קיימים
+        await setDoc(settingsRef, settingsData, { merge: true });
+        
+        const ok = document.getElementById('settingsSaveOk');
+        if(ok) { 
+            ok.classList.add('show'); 
+            setTimeout(() => ok.classList.remove('show'), 4000); 
+        }
+    } catch (err) {
+        console.error("Error saving settings:", err);
+    }
 };
 
 // Start

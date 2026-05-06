@@ -334,6 +334,9 @@ table tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+
+      
+
       <div class="form-section">
         <h3>תמונות סקציית "אודות"</h3>
         <div class="field-grid">
@@ -468,7 +471,7 @@ let SETTINGS = {};
 
 // ── CONSTANTS & DEFAULTS ────────────────────────────────
 const DEFAULT_PASS = 'cialo2026';
-function getPass() { return sessionStorage.getItem('cialo:pass') || DEFAULT_PASS; }
+function getPass() { return SETTINGS.adminPass || DEFAULT_PASS; }
 
 const DEFAULT_GALLERY = [
   {id:'g1',file:'vila_681_331148_JmHVx7E.jpg',title:'בריכה מחוממת',cat:'בריכה'},
@@ -913,6 +916,7 @@ function loadSettingsForm() {
 }
 
 window.saveSettings = async function() {
+  // 1. איסוף נתונים בסיסיים
   const settingsData = {
     phone: document.getElementById('s-phone').value,
     whatsapp: document.getElementById('s-whatsapp').value,
@@ -920,23 +924,33 @@ window.saveSettings = async function() {
     whatsappMsg: document.getElementById('s-wamsg').value
   };
 
-  await setDoc(settingsRef, settingsData, { merge: true });
-
+  // 2. טיפול בשינוי סיסמה - בדיקה אם הוזנו ערכים
   const oldPass = document.getElementById('s-passold').value;
   const newPass = document.getElementById('s-passnew').value;
-  if(oldPass && newPass) {
-    if(oldPass === getPass()){
-      sessionStorage.setItem('cialo:pass', newPass); 
+
+  if (oldPass && newPass) {
+    if (oldPass === getPass()) {
+      // אם הסיסמה הישנה תקינה, נוסיף את החדשה לאובייקט שיישלח ל-Firebase
+      settingsData.adminPass = newPass; 
+      
+      // איפוס השדות בטופס
       document.getElementById('s-passold').value = '';
       document.getElementById('s-passnew').value = '';
     } else {
-      alert('הסיסמה הנוכחית שגויה');
-      return;
+      alert('הסיסמה הנוכחית שגויה - השינויים לא נשמרו');
+      return; // עוצר הכל ולא שומר כלום אם הסיסמה שגויה
     }
   }
 
+  // 3. שמירה ל-Firebase (כולל הסיסמה אם עודכנה בתוך settingsData)
+  await setDoc(settingsRef, settingsData, { merge: true });
+
+  // 4. חיווי ויזואלי על הצלחה
   const ok = document.getElementById('settingsSaveOk');
-  if(ok) { ok.classList.add('show'); setTimeout(() => ok.classList.remove('show'), 3000); }
+  if(ok) { 
+    ok.classList.add('show'); 
+    setTimeout(() => ok.classList.remove('show'), 3000); 
+  }
 };
 
 // Start
